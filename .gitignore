@@ -1,0 +1,77 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.code-workspace
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+!bmk-ui/.env.example
+!.env.*.example
+*.pem
+*.key
+secrets/
+credentials*.json
+
+# Docker
+postgres_data/
+
+# Python / Django (bmk-api)
+bmk-api/venv/
+bmk-api/**/__pycache__/
+bmk-api/**/*.py[cod]
+bmk-api/**/*$py.class
+bmk-api/**/*.so
+bmk-api/*.egg-info/
+bmk-api/.eggs/
+bmk-api/dist/
+bmk-api/build/
+bmk-api/.pytest_cache/
+bmk-api/.mypy_cache/
+bmk-api/.ruff_cache/
+bmk-api/.coverage
+bmk-api/htmlcov/
+bmk-api/coverage.xml
+bmk-api/db.sqlite3
+bmk-api/db.sqlite3-*
+bmk-api/media/
+bmk-api/staticfiles/
+bmk-api/local_settings.py
+bmk-api/*.log
+
+# Node / React (bmk-ui)
+bmk-ui/node_modules/
+bmk-ui/dist/
+bmk-ui/dist-ssr/
+bmk-ui/.vite/
+bmk-ui/coverage/
+bmk-ui/*.local
+bmk-ui/npm-debug.log*
+bmk-ui/yarn-debug.log*
+bmk-ui/yarn-error.log*
+bmk-ui/pnpm-debug.log*
+
+# Logs
+logs/
+*.log
+
+# Temp files
+tmp/
+tmp_*.txt
+*.tmp
+*.temp
+*.bak
+*.orig
+*~
