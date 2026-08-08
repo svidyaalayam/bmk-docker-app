@@ -5,14 +5,28 @@ from .models import School
 
 
 def _slug_from_host(host: str) -> str:
-    """balavikas.localhost:5173 → balavikas"""
+    """balavikas.localhost / balavikas.x.x.x.x.nip.io → balavikas"""
+    from django.conf import settings
+
     hostname = (host or '').split(':')[0].strip().lower()
     if not hostname or hostname in {'localhost', '127.0.0.1'}:
         return ''
-    if hostname.endswith('.localhost'):
-        sub = hostname[: -len('.localhost')]
-        if sub and '.' not in sub:
-            return sub
+
+    app_domain = getattr(settings, 'APP_DOMAIN', 'localhost').strip().lower()
+    candidates = []
+    if app_domain:
+        candidates.append(app_domain)
+    if 'localhost' not in candidates:
+        candidates.append('localhost')
+
+    for domain in candidates:
+        suffix = f'.{domain}'
+        if hostname == domain:
+            return ''
+        if hostname.endswith(suffix):
+            sub = hostname[: -len(suffix)]
+            if sub and '.' not in sub:
+                return sub
     return ''
 
 

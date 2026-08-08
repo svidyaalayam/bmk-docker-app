@@ -34,6 +34,13 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = env_bool('DJANGO_DEBUG', True)
 
+# Shared with the UI (VITE_APP_DOMAIN). School sites are {slug}.{APP_DOMAIN}
+APP_DOMAIN = (
+    os.environ.get('APP_DOMAIN')
+    or os.environ.get('VITE_APP_DOMAIN')
+    or 'localhost'
+).strip().lower()
+
 # Always allow local/docker service names; extend via DJANGO_ALLOWED_HOSTS
 # (comma-separated). Use "*" only for quick VM demos — lock down in production.
 _base_hosts = ['localhost', '127.0.0.1', '.localhost', 'api', 'web']

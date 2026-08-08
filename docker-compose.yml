@@ -31,6 +31,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bmkchangeme}
       SEED_ON_START: ${SEED_ON_START:-true}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      APP_DOMAIN: ${VITE_APP_DOMAIN:-localhost}
       PORT: 8000
     depends_on:
       db:
