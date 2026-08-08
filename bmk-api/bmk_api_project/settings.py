@@ -34,21 +34,33 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = env_bool('DJANGO_DEBUG', True)
 
-ALLOWED_HOSTS = env_list(
+# Always allow local/docker service names; extend via DJANGO_ALLOWED_HOSTS
+# (comma-separated). Use "*" only for quick VM demos — lock down in production.
+_base_hosts = ['localhost', '127.0.0.1', '.localhost', 'api', 'web']
+_extra_hosts = env_list(
     'DJANGO_ALLOWED_HOSTS',
-    ['localhost', '127.0.0.1', '.localhost', 'api'],
+    ['localhost', '127.0.0.1', '.localhost', 'api', 'web'],
 )
+ALLOWED_HOSTS = list(dict.fromkeys([*_base_hosts, *_extra_hosts]))
 
-CSRF_TRUSTED_ORIGINS = env_list(
-    'DJANGO_CSRF_TRUSTED_ORIGINS',
-    [
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'http://localhost:8080',
-        'http://127.0.0.1:8080',
-        'http://balamukundam.localhost:8080',
-        'http://balavikas.localhost:8080',
-    ],
+_base_csrf = [
+    'http://localhost',
+    'http://127.0.0.1',
+    'http://localhost:80',
+    'http://127.0.0.1:80',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://balamukundam.localhost',
+    'http://balavikas.localhost',
+    'http://balamukundam.localhost:80',
+    'http://balavikas.localhost:80',
+    'http://balamukundam.localhost:8080',
+    'http://balavikas.localhost:8080',
+]
+CSRF_TRUSTED_ORIGINS = list(
+    dict.fromkeys([*_base_csrf, *env_list('DJANGO_CSRF_TRUSTED_ORIGINS', [])])
 )
 
 INSTALLED_APPS = [

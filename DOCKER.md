@@ -16,7 +16,17 @@ Then open:
 - Balamukundam: http://balamukundam.localhost:8080/
 - Balavikas: http://balavikas.localhost:8080/
 - Django admin (via UI proxy): http://localhost:8080/admin/
+  - If you mapped `WEB_PORT=80`: http://localhost/admin/
 - API direct (optional): http://127.0.0.1:8000/api/public/schools/
+
+If admin returns **400 Bad Request**, Django rejected the `Host` header. In `.env` set:
+
+```env
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,.localhost,api,web,<YOUR-VM-PUBLIC-IP>
+DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost,http://127.0.0.1,http://<YOUR-VM-PUBLIC-IP>,http://localhost:8080
+```
+
+Then recreate API: `docker compose up -d --build api`
 
 Demo admins: `bmk_admin` / `bv_admin` — password `Demo@12345`
 
