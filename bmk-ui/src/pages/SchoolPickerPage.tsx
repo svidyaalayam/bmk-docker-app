@@ -2,6 +2,17 @@ import { useEffect, useState } from 'react'
 import { fetchSchools } from '../api/public'
 import type { SchoolSummary } from '../types/content'
 import { schoolSiteUrl } from '../utils/tenant'
+import { environmentBannerLabel, resolveAppEnvironment } from '../utils/appEnv'
+
+const APP_DOMAIN = (import.meta.env.VITE_APP_DOMAIN || 'localhost').toLowerCase()
+const APP_ENV = resolveAppEnvironment()
+const ENV_BANNER = environmentBannerLabel(APP_ENV)
+
+const BRAND = {
+  english: 'Balamukundam - Vidyalayam',
+  devanagari: 'बालमुकुन्दम् - विद्यालयम्',
+  telugu: 'బాలముకుందం - విద్యాలయం',
+}
 
 export default function SchoolPickerPage() {
   const [schools, setSchools] = useState<SchoolSummary[]>([])
@@ -17,17 +28,35 @@ export default function SchoolPickerPage() {
 
   return (
     <div className="page-shell">
+      {ENV_BANNER && (
+        <div className={`env-banner env-${APP_ENV}`} role="status">
+          {ENV_BANNER}
+        </div>
+      )}
+
       <header className="site-header">
         <div className="site-brand">
-          <span className="site-brand-mark">BMK</span>
-          <span className="site-brand-text">Online School Platform</span>
+          <img className="site-brand-logo" src="/logo.svg" alt="" width={36} height={36} />
+          <span className="site-brand-text">{BRAND.english}</span>
         </div>
       </header>
 
+      <section className="platform-hero">
+        <img className="platform-hero-logo" src="/logo.svg" alt="" />
+        <h1 className="platform-brand-en">{BRAND.english}</h1>
+        <p className="platform-brand-hi" lang="hi">
+          {BRAND.devanagari}
+        </p>
+        <p className="platform-brand-te" lang="te">
+          {BRAND.telugu}
+        </p>
+        <p className="platform-hero-lead">Pick your school below. Then tap the button to open it.</p>
+      </section>
+
       <main className="home-section first">
         <div className="home-section-head">
-          <h2>Choose your school</h2>
-          <p>Each school has its own site address — school name first, then the shared platform.</p>
+          <h2>Which school are you in?</h2>
+          <p>Find your school name and open it.</p>
         </div>
 
         {loading && (
@@ -42,11 +71,13 @@ export default function SchoolPickerPage() {
             <article className="home-card" key={school.id}>
               <h3>{school.name}</h3>
               <p>
-                <code>{school.slug}.localhost</code>
+                <code>
+                  {school.slug}.{APP_DOMAIN}
+                </code>
               </p>
               <p>
                 <a className="home-btn" href={schoolSiteUrl(school.slug, '/')}>
-                  Open school site
+                  Open my school
                 </a>
               </p>
             </article>

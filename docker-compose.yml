@@ -8,7 +8,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-bmk} -d ${POSTGRES_DB:-bmk}']
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-bmk} -d ${POSTGRES_DB:-bmk}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -38,7 +42,7 @@ services:
         condition: service_healthy
     # Optional direct API access for debugging
     ports:
-      - '8000:8000'
+      - "8000:8000"
 
   web:
     build:
@@ -46,8 +50,9 @@ services:
       args:
         VITE_APP_DOMAIN: ${VITE_APP_DOMAIN:-localhost}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_APP_ENV: ${VITE_APP_ENV:-production}
     ports:
-      - '${WEB_PORT:-8080}:80'
+      - "${WEB_PORT:-8080}:80"
     depends_on:
       - api
 

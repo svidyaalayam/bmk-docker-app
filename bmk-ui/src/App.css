@@ -36,6 +36,27 @@ body {
   flex-direction: column;
 }
 
+.env-banner {
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  font-size: 0.78rem;
+  padding: 8px 12px;
+  color: #12241f;
+}
+
+.env-banner.env-test {
+  background: #f6c945;
+}
+
+.env-banner.env-staging {
+  background: #7ec8ff;
+}
+
+.env-banner.env-local {
+  background: #c5d4ce;
+}
+
 .site-header {
   display: flex;
   align-items: center;
@@ -71,8 +92,63 @@ body {
   letter-spacing: 0.04em;
 }
 
+.site-brand-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .site-brand-text {
   font-size: 1rem;
+}
+
+.platform-hero {
+  padding: 48px 24px 28px;
+  max-width: 920px;
+  margin: 0 auto;
+  text-align: center;
+  color: white;
+}
+
+.platform-hero-logo {
+  width: min(140px, 32vw);
+  height: auto;
+  border-radius: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+}
+
+.platform-brand-en {
+  margin: 0;
+  font-family: Literata, "Segoe UI", serif;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.platform-brand-hi,
+.platform-brand-te {
+  margin: 10px 0 0;
+  font-size: clamp(1.15rem, 2.4vw, 1.55rem);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.platform-brand-hi {
+  font-family: "Noto Sans Devanagari", "Segoe UI", sans-serif;
+}
+
+.platform-brand-te {
+  font-family: "Noto Sans Telugu", "Segoe UI", sans-serif;
+}
+
+.platform-hero-lead {
+  margin: 18px auto 0;
+  max-width: 46ch;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1.05rem;
 }
 
 .site-nav {
