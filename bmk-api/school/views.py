@@ -8,14 +8,13 @@ from authentication.permissions import IsAdminRole
 from authentication.serializers import UserSerializer
 from .models import Course, CourseClass, School, Student, Teacher
 from .serializers import (
-    AdminUserCreateSerializer,
     HomepageContentSerializer,
     SchoolSerializer,
     SchoolSettingsSerializer,
-    StudentCreateSerializer,
     StudentSerializer,
-    TeacherCreateSerializer,
+    StudentUpdateSerializer,
     TeacherSerializer,
+    TeacherUpdateSerializer,
 )
 from .tenancy import resolve_school
 
@@ -27,7 +26,7 @@ class SchoolListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        schools = School.objects.filter(is_active=True)
+        schools = School.objects.filter(is_active=True).select_related('settings')
         return Response(SchoolSerializer(schools, many=True).data)
 
 
@@ -81,46 +80,70 @@ class UserListView(generics.ListAPIView):
 
 
 class AdminUserCreateView(APIView):
+    """User creation by admins is disabled — registration only."""
+
     permission_classes = [IsAdminRole]
 
     def post(self, request):
-        serializer = AdminUserCreateSerializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        return Response(
+            {'detail': 'Admins cannot create users. Users must register themselves.'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
 
 
-class TeacherListCreateView(generics.ListCreateAPIView):
+class TeacherListView(generics.ListAPIView):
     permission_classes = [IsAdminRole]
+    serializer_class = TeacherSerializer
+
+    def get_queryset(self):
+        return Teacher.objects.filter(school=self.request.user.school).select_related('user')
+
+
+class TeacherDetailView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAdminRole]
+    http_method_names = ['get', 'put', 'patch', 'head', 'options']
 
     def get_queryset(self):
         return Teacher.objects.filter(school=self.request.user.school).select_related('user')
 
     def get_serializer_class(self):
-        if self.request.method == 'POST':
-            return TeacherCreateSerializer
+        if self.request.method in ('PUT', 'PATCH'):
+            return TeacherUpdateSerializer
         return TeacherSerializer
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         teacher = serializer.save()
-        return Response(TeacherSerializer(teacher).data, status=status.HTTP_201_CREATED)
+        return Response(TeacherSerializer(teacher).data)
 
 
-class StudentListCreateView(generics.ListCreateAPIView):
+class StudentListView(generics.ListAPIView):
     permission_classes = [IsAdminRole]
+    serializer_class = StudentSerializer
+
+    def get_queryset(self):
+        return Student.objects.filter(school=self.request.user.school).select_related('user')
+
+
+class StudentDetailView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAdminRole]
+    http_method_names = ['get', 'put', 'patch', 'head', 'options']
 
     def get_queryset(self):
         return Student.objects.filter(school=self.request.user.school).select_related('user')
 
     def get_serializer_class(self):
-        if self.request.method == 'POST':
-            return StudentCreateSerializer
+        if self.request.method in ('PUT', 'PATCH'):
+            return StudentUpdateSerializer
         return StudentSerializer
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         student = serializer.save()
-        return Response(StudentSerializer(student).data, status=status.HTTP_201_CREATED)
+        return Response(StudentSerializer(student).data)

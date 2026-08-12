@@ -1,59 +1,42 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import {
-  createAdmin,
-  createStudent,
-  createTeacher,
-  listStudents,
-  listTeachers,
-  listUsers,
-} from '../api/school'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { listStudents, listTeachers, listUsers, updateStudent, updateTeacher } from '../api/school'
+import { activateUser, listPendingUsers } from '../api/auth'
+import DataTable, { type DataTableColumn } from '../components/DataTable'
 import SiteHeader from '../components/SiteHeader'
 import type { User } from '../types/auth'
-import type {
-  CreateRole,
-  Gender,
-  StudentProfile,
-  TeacherProfile,
-} from '../types/school'
+import type { Gender, StudentProfile, TeacherProfile } from '../types/school'
 import { getErrorMessage } from '../utils/errors'
 
-const emptyCommon = {
-  username: '',
-  password: '',
-  email: '',
-  first_name: '',
-  last_name: '',
-  phone_number: '',
+type EditTarget =
+  | { kind: 'teacher'; profile: TeacherProfile }
+  | { kind: 'student'; profile: StudentProfile }
+  | null
+
+function fullName(first?: string, last?: string): string {
+  return `${first || ''} ${last || ''}`.trim()
 }
 
 export default function AdminUsersPage() {
-  const [role, setRole] = useState<CreateRole>('STUDENT')
-  const [common, setCommon] = useState(emptyCommon)
-  const [gender, setGender] = useState<Gender>('M')
-  const [phone, setPhone] = useState('')
-  const [dateOfBirth, setDateOfBirth] = useState('')
-  const [parentName, setParentName] = useState('')
-  const [parentPhone, setParentPhone] = useState('')
-  const [address, setAddress] = useState('')
-  const [notes, setNotes] = useState('')
-
   const [users, setUsers] = useState<User[]>([])
   const [teachers, setTeachers] = useState<TeacherProfile[]>([])
   const [students, setStudents] = useState<StudentProfile[]>([])
-
+  const [pending, setPending] = useState<User[]>([])
+  const [editing, setEditing] = useState<EditTarget>(null)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
   const refresh = async () => {
-    const [userData, teacherData, studentData] = await Promise.all([
+    const [userData, teacherData, studentData, pendingData] = await Promise.all([
       listUsers(),
       listTeachers(),
       listStudents(),
+      listPendingUsers(),
     ])
     setUsers(userData)
     setTeachers(teacherData)
     setStudents(studentData)
+    setPending(pendingData)
   }
 
   useEffect(() => {
@@ -62,54 +45,143 @@ export default function AdminUsersPage() {
 
   const admins = useMemo(() => users.filter((u) => u.role === 'ADMIN'), [users])
 
-  const resetForm = () => {
-    setCommon(emptyCommon)
-    setGender('M')
-    setPhone('')
-    setDateOfBirth('')
-    setParentName('')
-    setParentPhone('')
-    setAddress('')
-    setNotes('')
-  }
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
+  const handleActivate = useCallback(async (userId: number) => {
     setError('')
     setMessage('')
     try {
-      if (role === 'ADMIN') {
-        const user = await createAdmin(common)
-        setMessage(`Admin ${user.username} created.`)
-      } else if (role === 'TEACHER') {
-        const teacher = await createTeacher({
-          ...common,
-          gender,
-          phone: phone || common.phone_number,
-        })
-        setMessage(`Teacher ${teacher.user.username} created.`)
-      } else {
-        const student = await createStudent({
-          ...common,
-          gender,
-          date_of_birth: dateOfBirth || null,
-          phone: phone || common.phone_number,
-          parent_name: parentName,
-          parent_phone: parentPhone,
-          address,
-          notes,
-        })
-        setMessage(`Student ${student.user.username} created.`)
-      }
-      resetForm()
+      await activateUser(userId)
+      setMessage('User activated.')
       await refresh()
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not create user.'))
-    } finally {
-      setSubmitting(false)
+      setError(getErrorMessage(err, 'Could not activate user.'))
     }
-  }
+  }, [])
+
+  const pendingColumns = useMemo<DataTableColumn<User>[]>(
+    () => [
+      { key: 'email', header: 'Email', getValue: (u) => u.email },
+      {
+        key: 'name',
+        header: 'Name',
+        getValue: (u) => fullName(u.first_name, u.last_name),
+      },
+      { key: 'role', header: 'Role', getValue: (u) => u.role },
+      { key: 'phone', header: 'Phone', getValue: (u) => u.phone_number || '' },
+      {
+        key: 'actions',
+        header: '',
+        sortable: false,
+        filterable: false,
+        render: (u) => (
+          <button type="button" className="home-btn" onClick={() => handleActivate(u.id)}>
+            Set Active
+          </button>
+        ),
+      },
+    ],
+    [handleActivate],
+  )
+
+  const teacherColumns = useMemo<DataTableColumn<TeacherProfile>[]>(
+    () => [
+      { key: 'username', header: 'Username', getValue: (t) => t.user.username },
+      {
+        key: 'name',
+        header: 'Name',
+        getValue: (t) => fullName(t.user.first_name, t.user.last_name),
+      },
+      { key: 'email', header: 'Email', getValue: (t) => t.user.email || '' },
+      { key: 'gender', header: 'Gender', getValue: (t) => t.gender },
+      {
+        key: 'phone',
+        header: 'Phone',
+        getValue: (t) => t.phone || t.user.phone_number || '',
+      },
+      {
+        key: 'active',
+        header: 'Active',
+        getValue: (t) => (t.is_active && t.user.is_active ? 'Yes' : 'No'),
+      },
+      {
+        key: 'actions',
+        header: '',
+        sortable: false,
+        filterable: false,
+        render: (t) => (
+          <button
+            type="button"
+            className="home-btn"
+            onClick={() => {
+              setMessage('')
+              setError('')
+              setEditing({ kind: 'teacher', profile: t })
+            }}
+          >
+            Edit
+          </button>
+        ),
+      },
+    ],
+    [],
+  )
+
+  const studentColumns = useMemo<DataTableColumn<StudentProfile>[]>(
+    () => [
+      { key: 'username', header: 'Username', getValue: (s) => s.user.username },
+      {
+        key: 'name',
+        header: 'Name',
+        getValue: (s) => fullName(s.user.first_name, s.user.last_name),
+      },
+      { key: 'email', header: 'Email', getValue: (s) => s.user.email || '' },
+      { key: 'gender', header: 'Gender', getValue: (s) => s.gender },
+      { key: 'parent', header: 'Parent', getValue: (s) => s.parent_name || '' },
+      {
+        key: 'phone',
+        header: 'Phone',
+        getValue: (s) => s.phone || s.user.phone_number || '',
+      },
+      {
+        key: 'active',
+        header: 'Active',
+        getValue: (s) => (s.is_active && s.user.is_active ? 'Yes' : 'No'),
+      },
+      {
+        key: 'actions',
+        header: '',
+        sortable: false,
+        filterable: false,
+        render: (s) => (
+          <button
+            type="button"
+            className="home-btn"
+            onClick={() => {
+              setMessage('')
+              setError('')
+              setEditing({ kind: 'student', profile: s })
+            }}
+          >
+            Edit
+          </button>
+        ),
+      },
+    ],
+    [],
+  )
+
+  const adminColumns = useMemo<DataTableColumn<User>[]>(
+    () => [
+      { key: 'username', header: 'Username', getValue: (u) => u.username },
+      {
+        key: 'name',
+        header: 'Name',
+        getValue: (u) => fullName(u.first_name, u.last_name),
+      },
+      { key: 'email', header: 'Email', getValue: (u) => u.email || '' },
+      { key: 'phone', header: 'Phone', getValue: (u) => u.phone_number || '' },
+    ],
+    [],
+  )
 
   return (
     <div className="page-shell">
@@ -120,94 +192,211 @@ export default function AdminUsersPage() {
           <div>
             <p className="brand light">Administration</p>
             <h1>User Management</h1>
-            <p className="header-sub">Create admins, teachers, and students.</p>
+            <p className="header-sub">
+              Review registrations and edit student or teacher details. Users are created only
+              through registration — passwords are never shown here.
+            </p>
           </div>
         </header>
 
+        {message && <p className="success">{message}</p>}
+        {error && <p className="error">{error}</p>}
+
         <section className="dash-panel">
-        <h2>Create user</h2>
-        <div className="role-tabs">
-          {(['STUDENT', 'TEACHER', 'ADMIN'] as CreateRole[]).map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={role === item ? 'tab active' : 'tab'}
-              onClick={() => setRole(item)}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
+          <h2>Pending activation ({pending.length})</h2>
+          <p className="header-sub">
+            Email confirmed — waiting for admin approval before they can sign in.
+          </p>
+          <DataTable
+            rows={pending}
+            columns={pendingColumns}
+            rowKey={(u) => u.id}
+            emptyMessage="No users waiting for activation."
+            searchPlaceholder="Filter pending users…"
+          />
+        </section>
+
+        <section className="dash-panel">
+          <h2>Teachers ({teachers.length})</h2>
+          <DataTable
+            rows={teachers}
+            columns={teacherColumns}
+            rowKey={(t) => t.id}
+            emptyMessage="No teachers yet."
+            searchPlaceholder="Filter teachers…"
+          />
+        </section>
+
+        <section className="dash-panel">
+          <h2>Students ({students.length})</h2>
+          <DataTable
+            rows={students}
+            columns={studentColumns}
+            rowKey={(s) => s.id}
+            emptyMessage="No students yet."
+            searchPlaceholder="Filter students…"
+          />
+        </section>
+
+        <section className="dash-panel">
+          <h2>Admins ({admins.length})</h2>
+          <p className="header-sub">Admin accounts are listed for reference (view only).</p>
+          <DataTable
+            rows={admins}
+            columns={adminColumns}
+            rowKey={(u) => u.id}
+            emptyMessage="No admins yet."
+            searchPlaceholder="Filter admins…"
+          />
+        </section>
+
+        {editing && (
+          <EditUserModal
+            target={editing}
+            submitting={submitting}
+            onClose={() => setEditing(null)}
+            onSave={async (payload) => {
+              setSubmitting(true)
+              setError('')
+              setMessage('')
+              try {
+                if (editing.kind === 'teacher') {
+                  await updateTeacher(editing.profile.id, payload)
+                  setMessage('Teacher updated.')
+                } else {
+                  await updateStudent(editing.profile.id, payload)
+                  setMessage('Student updated.')
+                }
+                setEditing(null)
+                await refresh()
+              } catch (err) {
+                setError(getErrorMessage(err, 'Could not save changes.'))
+              } finally {
+                setSubmitting(false)
+              }
+            }}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EditUserModal({
+  target,
+  submitting,
+  onClose,
+  onSave,
+}: {
+  target: Exclude<EditTarget, null>
+  submitting: boolean
+  onClose: () => void
+  onSave: (payload: Record<string, unknown>) => Promise<void>
+}) {
+  const profile = target.profile
+  const user = profile.user
+  const [firstName, setFirstName] = useState(user.first_name || '')
+  const [lastName, setLastName] = useState(user.last_name || '')
+  const [email, setEmail] = useState(user.email || '')
+  const [phoneNumber, setPhoneNumber] = useState(user.phone_number || '')
+  const [gender, setGender] = useState<Gender>(profile.gender)
+  const [phone, setPhone] = useState(profile.phone || '')
+  const [isActive, setIsActive] = useState(Boolean(profile.is_active && user.is_active))
+  const [dateOfBirth, setDateOfBirth] = useState(
+    target.kind === 'student' ? target.profile.date_of_birth || '' : '',
+  )
+  const [parentName, setParentName] = useState(
+    target.kind === 'student' ? target.profile.parent_name || '' : '',
+  )
+  const [parentPhone, setParentPhone] = useState(
+    target.kind === 'student' ? target.profile.parent_phone || '' : '',
+  )
+  const [address, setAddress] = useState(
+    target.kind === 'student' ? target.profile.address || '' : '',
+  )
+  const [notes, setNotes] = useState(target.kind === 'student' ? target.profile.notes || '' : '')
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    const payload: Record<string, unknown> = {
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone_number: phoneNumber || null,
+      gender,
+      phone,
+      is_active: isActive,
+    }
+    if (target.kind === 'student') {
+      payload.date_of_birth = dateOfBirth || null
+      payload.parent_name = parentName
+      payload.parent_phone = parentPhone
+      payload.address = address
+      payload.notes = notes
+    }
+    await onSave(payload)
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="dash-panel edit-user-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-user-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="edit-user-title">
+          Edit {target.kind === 'teacher' ? 'teacher' : 'student'}: {user.username}
+        </h2>
+        <p className="header-sub">Password is not visible and cannot be changed here.</p>
 
         <form className="admin-form" onSubmit={handleSubmit}>
           <div className="form-grid">
             <label>
               Username
-              <input
-                required
-                value={common.username}
-                onChange={(e) => setCommon({ ...common, username: e.target.value })}
-              />
+              <input value={user.username} disabled readOnly />
             </label>
             <label>
-              Password
-              <input
-                required
-                type="password"
-                minLength={8}
-                value={common.password}
-                onChange={(e) => setCommon({ ...common, password: e.target.value })}
-              />
+              Active
+              <select
+                value={isActive ? 'yes' : 'no'}
+                onChange={(e) => setIsActive(e.target.value === 'yes')}
+              >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
             </label>
             <label>
               First name
-              <input
-                value={common.first_name}
-                onChange={(e) => setCommon({ ...common, first_name: e.target.value })}
-              />
+              <input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
             </label>
             <label>
               Last name
-              <input
-                value={common.last_name}
-                onChange={(e) => setCommon({ ...common, last_name: e.target.value })}
-              />
+              <input value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </label>
             <label>
               Email
-              <input
-                type="email"
-                value={common.email}
-                onChange={(e) => setCommon({ ...common, email: e.target.value })}
-              />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </label>
             <label>
               Account phone
-              <input
-                value={common.phone_number}
-                onChange={(e) => setCommon({ ...common, phone_number: e.target.value })}
-              />
+              <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+            </label>
+            <label>
+              Gender
+              <select value={gender} onChange={(e) => setGender(e.target.value as Gender)}>
+                <option value="M">{target.kind === 'student' ? 'Boy' : 'Male'}</option>
+                <option value="F">{target.kind === 'student' ? 'Girl' : 'Female'}</option>
+              </select>
+            </label>
+            <label>
+              Profile phone
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} />
             </label>
           </div>
 
-          {(role === 'TEACHER' || role === 'STUDENT') && (
-            <div className="form-grid">
-              <label>
-                Gender
-                <select value={gender} onChange={(e) => setGender(e.target.value as Gender)}>
-                  <option value="M">Male</option>
-                  <option value="F">Female</option>
-                  <option value="O">Other</option>
-                </select>
-              </label>
-              <label>
-                Profile phone
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} />
-              </label>
-            </div>
-          )}
-
-          {role === 'STUDENT' && (
+          {target.kind === 'student' && (
             <div className="form-grid">
               <label>
                 Date of birth
@@ -236,122 +425,16 @@ export default function AdminUsersPage() {
             </div>
           )}
 
-          <button type="submit" disabled={submitting}>
-            {submitting ? 'Creating…' : `Create ${role.toLowerCase()}`}
-          </button>
+          <div className="form-actions">
+            <button type="button" className="tab" onClick={onClose} disabled={submitting}>
+              Cancel
+            </button>
+            <button type="submit" disabled={submitting}>
+              {submitting ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
         </form>
-
-        {message && <p className="success">{message}</p>}
-        {error && <p className="error">{error}</p>}
-      </section>
-
-      <section className="dash-panel">
-        <h2>Admins ({admins.length})</h2>
-        <UserTable users={admins} />
-      </section>
-
-      <section className="dash-panel">
-        <h2>Teachers ({teachers.length})</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Name</th>
-                <th>Gender</th>
-                <th>Phone</th>
-              </tr>
-            </thead>
-            <tbody>
-              {teachers.map((teacher) => (
-                <tr key={teacher.id}>
-                  <td>{teacher.user.username}</td>
-                  <td>
-                    {teacher.user.first_name} {teacher.user.last_name}
-                  </td>
-                  <td>{teacher.gender}</td>
-                  <td>{teacher.phone || '—'}</td>
-                </tr>
-              ))}
-              {teachers.length === 0 && (
-                <tr>
-                  <td colSpan={4}>No teachers yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="dash-panel">
-        <h2>Students ({students.length})</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Name</th>
-                <th>Gender</th>
-                <th>Parent</th>
-                <th>Phone</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((student) => (
-                <tr key={student.id}>
-                  <td>{student.user.username}</td>
-                  <td>
-                    {student.user.first_name} {student.user.last_name}
-                  </td>
-                  <td>{student.gender}</td>
-                  <td>{student.parent_name || '—'}</td>
-                  <td>{student.phone || '—'}</td>
-                </tr>
-              ))}
-              {students.length === 0 && (
-                <tr>
-                  <td colSpan={5}>No students yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
       </div>
-    </div>
-  )
-}
-
-function UserTable({ users }: { users: User[] }) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Username</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Phone</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr key={user.id}>
-              <td>{user.username}</td>
-              <td>
-                {user.first_name} {user.last_name}
-              </td>
-              <td>{user.email || '—'}</td>
-              <td>{user.phone_number || '—'}</td>
-            </tr>
-          ))}
-          {users.length === 0 && (
-            <tr>
-              <td colSpan={4}>No admins yet.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
     </div>
   )
 }

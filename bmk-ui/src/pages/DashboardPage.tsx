@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import SiteHeader from '../components/SiteHeader'
 import { useSchoolContent } from '../content/SchoolContentContext'
 import type { DashboardPayload } from '../types/auth'
-import { adminUsersPath } from '../utils/routes'
+import { adminClassesPath, adminUsersPath, myClassesPath } from '../utils/routes'
 
 const ROLE_LABELS = {
   ADMIN: 'Administrator',
@@ -62,7 +62,22 @@ export default function DashboardPage() {
 
           {user.role === 'ADMIN' && (
             <p className="admin-cta">
+              {typeof payload?.pending_activations === 'number' &&
+                payload.pending_activations > 0 && (
+                  <>
+                    {payload.pending_activations} user
+                    {payload.pending_activations === 1 ? '' : 's'} waiting for activation.{' '}
+                  </>
+                )}
               <Link to={adminUsersPath()}>Open user management →</Link>
+              {' · '}
+              <Link to={adminClassesPath()}>Open class management →</Link>
+            </p>
+          )}
+
+          {(user.role === 'TEACHER' || user.role === 'STUDENT') && (
+            <p className="admin-cta">
+              <Link to={myClassesPath(user.role)}>Open my classes →</Link>
             </p>
           )}
         </section>

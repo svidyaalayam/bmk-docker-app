@@ -1,11 +1,10 @@
 import { api } from './client'
 import type { User } from '../types/auth'
 import type {
-  CreateAdminPayload,
-  CreateStudentPayload,
-  CreateTeacherPayload,
   StudentProfile,
   TeacherProfile,
+  UpdateStudentPayload,
+  UpdateTeacherPayload,
 } from '../types/school'
 
 export async function listUsers(role?: string): Promise<User[]> {
@@ -25,17 +24,18 @@ export async function listTeachers(): Promise<TeacherProfile[]> {
   return data
 }
 
-export async function createAdmin(payload: CreateAdminPayload): Promise<User> {
-  const { data } = await api.post<User>('/api/users/admins/', payload)
+export async function updateTeacher(
+  id: number,
+  payload: UpdateTeacherPayload,
+): Promise<TeacherProfile> {
+  const { data } = await api.patch<TeacherProfile>(`/api/teachers/${id}/`, payload)
   return data
 }
 
-export async function createTeacher(payload: CreateTeacherPayload): Promise<TeacherProfile> {
-  const { data } = await api.post<TeacherProfile>('/api/teachers/', payload)
-  return data
-}
-
-export async function createStudent(payload: CreateStudentPayload): Promise<StudentProfile> {
-  const { data } = await api.post<StudentProfile>('/api/students/', payload)
+export async function updateStudent(
+  id: number,
+  payload: UpdateStudentPayload,
+): Promise<StudentProfile> {
+  const { data } = await api.patch<StudentProfile>(`/api/students/${id}/`, payload)
   return data
 }

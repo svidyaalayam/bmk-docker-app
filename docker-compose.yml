@@ -8,11 +8,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-bmk} -d ${POSTGRES_DB:-bmk}",
-        ]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-bmk} -d ${POSTGRES_DB:-bmk}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -37,12 +33,23 @@ services:
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
       APP_DOMAIN: ${VITE_APP_DOMAIN:-localhost}
       PORT: 8000
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Balamukundam Vidyalayam <noreply@balamukundam.com>}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}
+      FRONTEND_PORT: ${FRONTEND_PORT:-}
+    volumes:
+      - media_data:/app/media
     depends_on:
       db:
         condition: service_healthy
-    # Optional direct API access for debugging
+    # Optional direct API access for debugging (change API_PORT per env on same VM)
     ports:
-      - "${API_PORT:-8000}:8000"
+      - '${API_PORT:-8000}:8000'
 
   web:
     build:
@@ -50,11 +57,12 @@ services:
       args:
         VITE_APP_DOMAIN: ${VITE_APP_DOMAIN:-localhost}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
-        VITE_APP_ENV: ${VITE_APP_ENV:-production}
+        VITE_APP_ENV: ${VITE_APP_ENV:-local}
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - '${WEB_PORT:-8080}:80'
     depends_on:
       - api
 
 volumes:
   postgres_data:
+  media_data:

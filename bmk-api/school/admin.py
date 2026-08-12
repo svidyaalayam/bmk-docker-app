@@ -1,6 +1,20 @@
 from django.contrib import admin
 
-from .models import Course, CourseClass, School, SchoolSettings, Student, Teacher
+from .models import (
+    ClassMembership,
+    ClassSession,
+    ClassSessionAttendance,
+    ClassSessionComment,
+    ClassSessionHomework,
+    ClassSessionMaterial,
+    Course,
+    CourseClass,
+    School,
+    SchoolSettings,
+    Student,
+    Teacher,
+    TeachingClass,
+)
 
 
 class SchoolSettingsInline(admin.StackedInline):
@@ -26,7 +40,7 @@ class SchoolSettingsAdmin(admin.ModelAdmin):
     autocomplete_fields = ('school',)
     fieldsets = (
         ('School', {
-            'fields': ('school', 'school_name', 'tagline', 'footer_text'),
+            'fields': ('school', 'school_name', 'logo', 'tagline', 'footer_text'),
         }),
         ('Introduction page', {
             'fields': ('introduction', 'secondary_language', 'introduction_secondary'),
@@ -131,3 +145,59 @@ class TeacherAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'user__first_name', 'user__last_name')
     raw_id_fields = ('user', 'created_by', 'updated_by')
     autocomplete_fields = ('school',)
+
+
+class ClassMembershipInline(admin.TabularInline):
+    model = ClassMembership
+    extra = 0
+    raw_id_fields = ('student', 'created_by', 'updated_by')
+
+
+class ClassSessionInline(admin.TabularInline):
+    model = ClassSession
+    extra = 0
+    fields = ('session_date', 'classwork', 'homework', 'is_started', 'started_at')
+    readonly_fields = ('is_started', 'started_at')
+
+
+@admin.register(TeachingClass)
+class TeachingClassAdmin(admin.ModelAdmin):
+    list_display = ('name', 'school', 'teacher_1', 'teacher_2', 'is_active', 'updated_at')
+    list_filter = ('school', 'is_active')
+    search_fields = ('name', 'description')
+    autocomplete_fields = ('school',)
+    raw_id_fields = ('teacher_1', 'teacher_2', 'created_by', 'updated_by')
+    inlines = [ClassMembershipInline, ClassSessionInline]
+
+
+@admin.register(ClassSession)
+class ClassSessionAdmin(admin.ModelAdmin):
+    list_display = ('teaching_class', 'session_date', 'is_started', 'started_at')
+    list_filter = ('is_started', 'teaching_class__school')
+    raw_id_fields = ('teaching_class', 'created_by', 'updated_by')
+
+
+@admin.register(ClassSessionAttendance)
+class ClassSessionAttendanceAdmin(admin.ModelAdmin):
+    list_display = ('session', 'student', 'status', 'updated_at')
+    list_filter = ('status',)
+    raw_id_fields = ('session', 'student', 'created_by', 'updated_by')
+
+
+@admin.register(ClassSessionComment)
+class ClassSessionCommentAdmin(admin.ModelAdmin):
+    list_display = ('session', 'student', 'author', 'created_at')
+    raw_id_fields = ('session', 'student', 'author', 'created_by', 'updated_by')
+
+
+@admin.register(ClassSessionHomework)
+class ClassSessionHomeworkAdmin(admin.ModelAdmin):
+    list_display = ('session', 'student', 'original_filename', 'storage_backend', 'created_at')
+    raw_id_fields = ('session', 'student', 'created_by', 'updated_by')
+
+
+@admin.register(ClassSessionMaterial)
+class ClassSessionMaterialAdmin(admin.ModelAdmin):
+    list_display = ('session', 'kind', 'original_filename', 'created_at')
+    list_filter = ('kind',)
+    raw_id_fields = ('session', 'created_by', 'updated_by')

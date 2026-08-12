@@ -21,13 +21,26 @@ function brandMark(schoolName: string): string {
 export default function SiteHeader() {
   const { user, loading } = useAuth()
   const { school, schoolSlug } = useSchoolContent()
-  const mark = brandMark(school.school_name || schoolSlug)
+  const schoolName = school.school_name || schoolSlug
+  const mark = brandMark(schoolName)
 
   return (
     <header className="site-header">
       <NavLink to={schoolHomePath()} className="site-brand">
-        <span className="site-brand-mark">{mark}</span>
-        <span className="site-brand-text">{school.school_name || schoolSlug}</span>
+        {school.logo_url ? (
+          <img
+            className="site-brand-logo"
+            src={school.logo_url}
+            alt={`${schoolName} logo`}
+            width={36}
+            height={36}
+          />
+        ) : (
+          <span className="site-brand-mark" aria-hidden="true">
+            {mark}
+          </span>
+        )}
+        <span className="site-brand-text">{schoolName}</span>
       </NavLink>
 
       <nav className="site-nav" aria-label="Main">

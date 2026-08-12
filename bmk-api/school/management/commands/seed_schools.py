@@ -86,6 +86,9 @@ class Command(BaseCommand):
                     'school': school,
                     'is_staff': is_staff,
                     'is_superuser': is_superuser,
+                    'is_active': True,
+                    'email_verified': True,
+                    'profile_locked': False,
                 },
             )
             user.set_password(password)

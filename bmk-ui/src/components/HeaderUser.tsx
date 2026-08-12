@@ -1,8 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { getDisplayName, getInitials } from '../utils/userDisplay'
-import { schoolHomePath } from '../utils/routes'
+import { profilePath, schoolHomePath } from '../utils/routes'
+
+function avatarSrc(url?: string | null): string | null {
+  if (!url) return null
+  try {
+    const parsed = new URL(url, window.location.origin)
+    // Prefer same-origin path so Vite/Nginx proxies work.
+    if (parsed.origin === window.location.origin || parsed.pathname.startsWith('/media/')) {
+      return parsed.pathname + parsed.search
+    }
+    return url
+  } catch {
+    return url
+  }
+}
 
 export default function HeaderUser() {
   const { user, logout } = useAuth()
@@ -24,6 +38,7 @@ export default function HeaderUser() {
 
   const name = getDisplayName(user)
   const initials = getInitials(user)
+  const photo = avatarSrc(user.avatar_url)
 
   const handleLogout = () => {
     logout()
@@ -42,7 +57,7 @@ export default function HeaderUser() {
       >
         <span className="header-user-name">{name}</span>
         <span className="user-avatar" aria-hidden="true">
-          {initials}
+          {photo ? <img src={photo} alt="" /> : initials}
         </span>
       </button>
 
@@ -53,6 +68,14 @@ export default function HeaderUser() {
             <p className="header-user-meta-role">{user.role}</p>
             {user.email && <p className="header-user-meta-email">{user.email}</p>}
           </div>
+          <Link
+            to={profilePath()}
+            role="menuitem"
+            className="header-user-link"
+            onClick={() => setOpen(false)}
+          >
+            Edit profile
+          </Link>
           <button type="button" role="menuitem" onClick={handleLogout}>
             Sign out
           </button>

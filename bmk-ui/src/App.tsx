@@ -7,7 +7,16 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import AdminUsersPage from './pages/AdminUsersPage'
+import AdminClassesPage from './pages/AdminClassesPage'
+import MyClassesPage from './pages/MyClassesPage'
+import ClassDetailPage from './pages/ClassDetailPage'
 import SchoolPickerPage from './pages/SchoolPickerPage'
+import StudentRegisterPage from './pages/StudentRegisterPage'
+import TeacherRegisterPage from './pages/TeacherRegisterPage'
+import ConfirmEmailPage from './pages/ConfirmEmailPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import ProfilePage from './pages/ProfilePage'
 import { dashboardPathForRole, schoolHomePath, schoolLoginPath } from './utils/routes'
 import { getSchoolSlugFromHost, schoolSiteUrl } from './utils/tenant'
 import './App.css'
@@ -25,16 +34,30 @@ function SchoolRoutes({ schoolSlug }: { schoolSlug: string }) {
       <Routes>
         <Route index element={<HomePage />} />
         <Route path="login" element={<LoginPage />} />
+        <Route path="register/student" element={<StudentRegisterPage />} />
+        <Route path="register/teacher" element={<TeacherRegisterPage />} />
+        <Route path="confirm-email" element={<ConfirmEmailPage />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="profile" element={<ProfilePage />} />
+        </Route>
 
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route path="dashboard/admin" element={<DashboardPage />} />
           <Route path="dashboard/admin/users" element={<AdminUsersPage />} />
+          <Route path="dashboard/admin/classes" element={<AdminClassesPage />} />
         </Route>
         <Route element={<ProtectedRoute roles={['TEACHER']} />}>
           <Route path="dashboard/teacher" element={<DashboardPage />} />
+          <Route path="dashboard/teacher/classes" element={<MyClassesPage />} />
+          <Route path="dashboard/teacher/classes/:classId" element={<ClassDetailPage />} />
         </Route>
         <Route element={<ProtectedRoute roles={['STUDENT']} />}>
           <Route path="dashboard/student" element={<DashboardPage />} />
+          <Route path="dashboard/student/classes" element={<MyClassesPage />} />
+          <Route path="dashboard/student/classes/:classId" element={<ClassDetailPage />} />
         </Route>
 
         <Route path="dashboard" element={<DashboardRedirect />} />
@@ -44,7 +67,6 @@ function SchoolRoutes({ schoolSlug }: { schoolSlug: string }) {
   )
 }
 
-/** Old path URLs like /s/balavikas → http://balavikas.localhost:5173/ */
 function LegacyPathRedirect() {
   const { schoolSlug = '' } = useParams()
   useEffect(() => {

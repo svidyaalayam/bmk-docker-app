@@ -30,6 +30,7 @@ export interface SchoolSettings {
   school_id: number
   school_slug: string
   school_name: string
+  logo_url: string | null
   tagline: string
   introduction: string
   secondary_language: SecondaryLanguage
@@ -43,6 +44,7 @@ export interface SchoolSummary {
   name: string
   slug: string
   domain: string
+  logo_url: string | null
 }
 
 

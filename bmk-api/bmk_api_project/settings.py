@@ -176,6 +176,11 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+# Reasonable avatar upload limit (UI + API enforce this).
+MAX_AVATAR_BYTES = int(os.environ.get('MAX_AVATAR_BYTES', str(100 * 1024)))  # 100 KB
+
 if _WHITENOISE:
     STORAGES = {
         'default': {
@@ -251,3 +256,23 @@ CORS_ALLOW_HEADERS = [
 # Useful behind Nginx / reverse proxies
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
+
+# --- Email (confirmation + password reset) ---
+# Default: print emails to API logs (Docker-friendly for Test/Staging).
+# For real SMTP set EMAIL_HOST / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD in .env
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL',
+    'Balamukundam Vidyalayam <noreply@balamukundam.com>',
+)
+# Apex site used to build {slug}.{domain} links in emails
+FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL', '').rstrip('/')
+FRONTEND_PORT = os.environ.get('FRONTEND_PORT', '')
