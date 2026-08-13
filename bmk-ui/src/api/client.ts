@@ -14,6 +14,12 @@ export const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    // Let the browser set multipart boundary.
+    if (config.headers && 'Content-Type' in config.headers) {
+      delete config.headers['Content-Type']
+    }
+  }
   const url = config.url ?? ''
   const isPublic = url.includes('/api/public/')
   if (!isPublic) {

@@ -15,6 +15,7 @@ const fallbackSchool: SchoolSettings = {
   school_id: 0,
   school_slug: '',
   school_name: 'Online School',
+  logo_url: null,
   tagline: '',
   introduction: '',
   secondary_language: '',

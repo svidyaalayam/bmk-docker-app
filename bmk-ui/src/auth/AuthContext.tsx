@@ -16,6 +16,7 @@ interface AuthContextValue {
   loading: boolean
   login: (username: string, password: string, schoolSlug?: string) => Promise<User>
   logout: () => void
+  setUserProfile: (user: User) => void
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -77,9 +78,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
+  const setUserProfile = useCallback((profile: User) => {
+    setUser(profile)
+    localStorage.setItem('bmk_user', JSON.stringify(profile))
+  }, [])
+
   const value = useMemo(
-    () => ({ user, accessToken, loading, login, logout }),
-    [user, accessToken, loading, login, logout],
+    () => ({ user, accessToken, loading, login, logout, setUserProfile }),
+    [user, accessToken, loading, login, logout, setUserProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

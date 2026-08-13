@@ -212,8 +212,21 @@ export default function HomePage() {
       <main>
         <section id="introduction" className="home-section first">
           <div className="home-section-head">
-            <h2>{school.school_name}</h2>
-            <p>{school.tagline || 'About our school'}</p>
+            <div className="school-hero-brand">
+              {school.logo_url && (
+                <img
+                  className="school-hero-logo"
+                  src={school.logo_url}
+                  alt={`${school.school_name} logo`}
+                  width={56}
+                  height={56}
+                />
+              )}
+              <div>
+                <h2>{school.school_name}</h2>
+                <p>{school.tagline || 'About our school'}</p>
+              </div>
+            </div>
           </div>
 
           <div className={showSecondary ? 'intro-bilingual' : undefined}>

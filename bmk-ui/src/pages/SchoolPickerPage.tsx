@@ -69,7 +69,22 @@ export default function SchoolPickerPage() {
         <div className="home-card-grid">
           {schools.map((school) => (
             <article className="home-card" key={school.id}>
-              <h3>{school.name}</h3>
+              <div className="school-card-brand">
+                {school.logo_url ? (
+                  <img
+                    className="school-card-logo"
+                    src={school.logo_url}
+                    alt={`${school.name} logo`}
+                    width={48}
+                    height={48}
+                  />
+                ) : (
+                  <span className="site-brand-mark" aria-hidden="true">
+                    {school.name.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+                <h3>{school.name}</h3>
+              </div>
               <p>
                 <code>
                   {school.slug}.{APP_DOMAIN}

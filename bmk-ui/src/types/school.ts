@@ -1,4 +1,4 @@
-import type { User, UserRole } from './auth'
+import type { User } from './auth'
 
 export type Gender = 'M' | 'F' | 'O'
 
@@ -27,28 +27,27 @@ export interface TeacherProfile {
   updated_at: string
 }
 
-export interface CreateAdminPayload {
-  username: string
-  password: string
-  email?: string
+export interface UpdateTeacherPayload {
   first_name?: string
   last_name?: string
-  phone_number?: string
-}
-
-export interface CreateTeacherPayload extends CreateAdminPayload {
-  gender: Gender
+  email?: string
+  phone_number?: string | null
+  gender?: Gender
   phone?: string
+  is_active?: boolean
 }
 
-export interface CreateStudentPayload extends CreateAdminPayload {
-  gender: Gender
+export interface UpdateStudentPayload {
+  first_name?: string
+  last_name?: string
+  email?: string
+  phone_number?: string | null
+  gender?: Gender
   date_of_birth?: string | null
   phone?: string
   parent_name?: string
   parent_phone?: string
   address?: string
   notes?: string
+  is_active?: boolean
 }
-
-export type CreateRole = Extract<UserRole, 'ADMIN' | 'TEACHER' | 'STUDENT'>

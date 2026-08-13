@@ -22,6 +22,20 @@ class User(AbstractUser):
         related_name='users',
         help_text='School this user belongs to. Leave empty only for platform superusers.',
     )
+    email_verified = models.BooleanField(
+        default=False,
+        help_text='True after the user confirms their email address.',
+    )
+    profile_locked = models.BooleanField(
+        default=False,
+        help_text='When True, registration details cannot be changed by the user.',
+    )
+    avatar = models.ImageField(
+        upload_to='avatars/%Y/%m/',
+        blank=True,
+        null=True,
+        help_text='Optional profile photo shown as the user avatar.',
+    )
 
     @property
     def is_teacher(self):

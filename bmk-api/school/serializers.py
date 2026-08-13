@@ -9,9 +9,17 @@ User = get_user_model()
 
 
 class SchoolSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
     class Meta:
         model = School
-        fields = ('id', 'name', 'slug', 'domain')
+        fields = ('id', 'name', 'slug', 'domain', 'logo_url')
+
+    def get_logo_url(self, obj):
+        settings = getattr(obj, 'settings', None)
+        if not settings or not settings.logo:
+            return None
+        return settings.logo.url
 
 
 class CourseClassSerializer(serializers.ModelSerializer):
@@ -41,6 +49,7 @@ class CourseSerializer(serializers.ModelSerializer):
 class SchoolSettingsSerializer(serializers.ModelSerializer):
     school_slug = serializers.CharField(source='school.slug', read_only=True)
     school_id = serializers.IntegerField(source='school.id', read_only=True)
+    logo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = SchoolSettings
@@ -48,6 +57,7 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'school_id',
             'school_slug',
             'school_name',
+            'logo_url',
             'tagline',
             'introduction',
             'secondary_language',
@@ -55,6 +65,12 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'footer_text',
             'updated_at',
         )
+
+    def get_logo_url(self, obj):
+        if not obj.logo:
+            return None
+        # Relative /media/... path works with Vite/Nginx proxies.
+        return obj.logo.url
 
 
 class HomepageContentSerializer(serializers.Serializer):
@@ -101,6 +117,71 @@ class TeacherSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'user', 'is_active', 'created_at', 'updated_at')
 
 
+class StudentUpdateSerializer(serializers.Serializer):
+    """Admin edit of student details — no password, username stays read-only."""
+
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    phone_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    gender = serializers.ChoiceField(choices=Student.Gender.choices, required=False)
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
+    parent_name = serializers.CharField(required=False, allow_blank=True)
+    parent_phone = serializers.CharField(required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    is_active = serializers.BooleanField(required=False)
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        request = self.context['request']
+        user = instance.user
+        for field in ('first_name', 'last_name', 'email', 'phone_number'):
+            if field in validated_data:
+                setattr(user, field, validated_data.pop(field) or ('' if field != 'phone_number' else None))
+        if 'is_active' in validated_data:
+            is_active = validated_data.pop('is_active')
+            user.is_active = is_active
+            instance.is_active = is_active
+        user.save()
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.updated_by = request.user
+        instance.save()
+        return instance
+
+
+class TeacherUpdateSerializer(serializers.Serializer):
+    """Admin edit of teacher details — no password, username stays read-only."""
+
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    phone_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    gender = serializers.ChoiceField(choices=Teacher.Gender.choices, required=False)
+    phone = serializers.CharField(required=False, allow_blank=True)
+    is_active = serializers.BooleanField(required=False)
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        request = self.context['request']
+        user = instance.user
+        for field in ('first_name', 'last_name', 'email', 'phone_number'):
+            if field in validated_data:
+                setattr(user, field, validated_data.pop(field) or ('' if field != 'phone_number' else None))
+        if 'is_active' in validated_data:
+            is_active = validated_data.pop('is_active')
+            user.is_active = is_active
+            instance.is_active = is_active
+        user.save()
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.updated_by = request.user
+        instance.save()
+        return instance
+
+
 class BaseUserCreateSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(write_only=True, min_length=8)
@@ -124,48 +205,18 @@ class BaseUserCreateSerializer(serializers.Serializer):
 
 class AdminUserCreateSerializer(BaseUserCreateSerializer):
     def create(self, validated_data):
-        password = validated_data.pop('password')
-        school = self._school_from_request()
-        user = User(
-            role=User.Roles.ADMIN,
-            is_staff=True,
-            school=school,
-            **validated_data,
+        raise serializers.ValidationError(
+            'Admins cannot create users. Users must register themselves.'
         )
-        user.set_password(password)
-        user.save()
-        return user
 
 
 class TeacherCreateSerializer(BaseUserCreateSerializer):
     gender = serializers.ChoiceField(choices=Teacher.Gender.choices)
     phone = serializers.CharField(required=False, allow_blank=True, default='')
 
-    @transaction.atomic
     def create(self, validated_data):
-        request = self.context['request']
-        school = self._school_from_request()
-        password = validated_data.pop('password')
-        gender = validated_data.pop('gender')
-        phone = validated_data.pop('phone', '')
-        phone_number = validated_data.pop('phone_number', '') or phone
-
-        user = User(
-            role=User.Roles.TEACHER,
-            phone_number=phone_number or None,
-            school=school,
-            **validated_data,
-        )
-        user.set_password(password)
-        user.save()
-
-        return Teacher.objects.create(
-            school=school,
-            user=user,
-            gender=gender,
-            phone=phone or phone_number,
-            created_by=request.user,
-            updated_by=request.user,
+        raise serializers.ValidationError(
+            'Admins cannot create users. Teachers must register themselves.'
         )
 
 
@@ -178,35 +229,7 @@ class StudentCreateSerializer(BaseUserCreateSerializer):
     address = serializers.CharField(required=False, allow_blank=True, default='')
     notes = serializers.CharField(required=False, allow_blank=True, default='')
 
-    @transaction.atomic
     def create(self, validated_data):
-        request = self.context['request']
-        school = self._school_from_request()
-        password = validated_data.pop('password')
-        profile_fields = {
-            'gender': validated_data.pop('gender'),
-            'date_of_birth': validated_data.pop('date_of_birth', None),
-            'phone': validated_data.pop('phone', ''),
-            'parent_name': validated_data.pop('parent_name', ''),
-            'parent_phone': validated_data.pop('parent_phone', ''),
-            'address': validated_data.pop('address', ''),
-            'notes': validated_data.pop('notes', ''),
-        }
-        phone_number = validated_data.pop('phone_number', '') or profile_fields['phone']
-
-        user = User(
-            role=User.Roles.STUDENT,
-            phone_number=phone_number or None,
-            school=school,
-            **validated_data,
-        )
-        user.set_password(password)
-        user.save()
-
-        return Student.objects.create(
-            school=school,
-            user=user,
-            created_by=request.user,
-            updated_by=request.user,
-            **profile_fields,
+        raise serializers.ValidationError(
+            'Admins cannot create users. Students must register themselves.'
         )
