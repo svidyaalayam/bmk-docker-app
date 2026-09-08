@@ -61,6 +61,14 @@ export async function createSession(
   return data
 }
 
+export async function importCalendarDates(
+  classId: number,
+  dates: string[],
+): Promise<{ created_count: number; skipped_count: number; created: ClassSession[] }> {
+  const { data } = await api.post(`/api/classes/${classId}/calendar/import/`, { dates })
+  return data
+}
+
 export async function updateSession(
   sessionId: number,
   payload: { session_date?: string; classwork?: string; homework?: string },

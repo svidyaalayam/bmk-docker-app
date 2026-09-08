@@ -230,6 +230,10 @@ STORAGES = _storages
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Shared secret for Sikshavahini → BMK class catalog calls
+SIKSHAVAHINI_SHARED_SECRET = os.environ.get('SIKSHAVAHINI_SHARED_SECRET', '').strip()
+SUNAADAM_SHARED_SECRET = os.environ.get('SUNAADAM_SHARED_SECRET', '').strip()
+
 MAILERS = {
     'default': {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',

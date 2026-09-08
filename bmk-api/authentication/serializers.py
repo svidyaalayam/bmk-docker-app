@@ -20,6 +20,7 @@ class UserSerializer(serializers.ModelSerializer):
     school_id = serializers.IntegerField(source='school.id', read_only=True, allow_null=True)
     school_slug = serializers.CharField(source='school.slug', read_only=True, allow_null=True)
     school_name = serializers.CharField(source='school.name', read_only=True, allow_null=True)
+    lesson_app = serializers.CharField(source='school.lesson_app', read_only=True, allow_null=True)
     avatar_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -35,9 +36,11 @@ class UserSerializer(serializers.ModelSerializer):
             'school_id',
             'school_slug',
             'school_name',
+            'lesson_app',
             'email_verified',
             'is_active',
             'profile_locked',
+            'legacy_uid',
             'date_joined',
             'avatar_url',
         )
@@ -171,10 +174,24 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
+        token['user_id'] = user.id
         token['role'] = user.role
         token['username'] = user.username
+        token['email'] = user.email or ''
         token['school_id'] = user.school_id
         token['school_slug'] = user.school.slug if user.school_id else None
+        token['lesson_app'] = (
+            user.school.lesson_app if user.school_id else 'sikshavahini'
+        )
+        # Teaching-class ids for lesson-application view permissions
+        try:
+            from school.class_views import _classes_for_user
+
+            token['class_ids'] = list(
+                _classes_for_user(user).values_list('id', flat=True)
+            )
+        except Exception:
+            token['class_ids'] = []
         return token
 
 

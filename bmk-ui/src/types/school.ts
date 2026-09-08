@@ -15,6 +15,7 @@ export interface StudentProfile {
   is_active: boolean
   created_at: string
   updated_at: string
+  class_assignment_count: number
 }
 
 export interface TeacherProfile {
@@ -25,6 +26,7 @@ export interface TeacherProfile {
   is_active: boolean
   created_at: string
   updated_at: string
+  class_assignment_count: number
 }
 
 export interface UpdateTeacherPayload {

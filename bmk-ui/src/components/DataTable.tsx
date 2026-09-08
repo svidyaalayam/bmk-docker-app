@@ -22,6 +22,8 @@ type DataTableProps<T> = {
   initialPageSize?: number
   pageSizeOptions?: number[]
   searchPlaceholder?: string
+  selectedRowKeys?: Set<string | number>
+  onSelectedRowKeysChange?: (keys: Set<string | number>) => void
 }
 
 function cellText<T>(row: T, column: DataTableColumn<T>): string {
@@ -50,6 +52,8 @@ export default function DataTable<T>({
   initialPageSize = 10,
   pageSizeOptions = [5, 10, 25, 50],
   searchPlaceholder = 'Filter rows…',
+  selectedRowKeys,
+  onSelectedRowKeysChange,
 }: DataTableProps<T>) {
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<string | null>(null)
@@ -99,6 +103,25 @@ export default function DataTable<T>({
   const currentPage = Math.min(page, totalPages)
   const pageStart = (currentPage - 1) * pageSize
   const pageRows = filteredSorted.slice(pageStart, pageStart + pageSize)
+  const selectionEnabled = Boolean(selectedRowKeys && onSelectedRowKeysChange)
+  const selectableKeys = filteredSorted.map(rowKey)
+  const allFilteredSelected =
+    selectionEnabled && selectableKeys.length > 0 && selectableKeys.every((key) => selectedRowKeys.has(key))
+
+  const setSelected = (key: string | number, selected: boolean) => {
+    if (!selectedRowKeys || !onSelectedRowKeysChange) return
+    const next = new Set(selectedRowKeys)
+    if (selected) next.add(key)
+    else next.delete(key)
+    onSelectedRowKeysChange(next)
+  }
+
+  const setAllFilteredSelected = (selected: boolean) => {
+    if (!selectedRowKeys || !onSelectedRowKeysChange) return
+    const next = new Set(selectedRowKeys)
+    selectableKeys.forEach((key) => (selected ? next.add(key) : next.delete(key)))
+    onSelectedRowKeysChange(next)
+  }
 
   const toggleSort = (key: string) => {
     if (sortKey === key) {
@@ -147,6 +170,16 @@ export default function DataTable<T>({
         <table>
           <thead>
             <tr>
+              {selectionEnabled && (
+                <th>
+                  <input
+                    type="checkbox"
+                    aria-label="Select all filtered rows"
+                    checked={allFilteredSelected}
+                    onChange={(event) => setAllFilteredSelected(event.target.checked)}
+                  />
+                </th>
+              )}
               {columns.map((column) => {
                 const sortable = column.sortable !== false && Boolean(column.getValue || column.sortValue)
                 const active = sortKey === column.key
@@ -174,6 +207,16 @@ export default function DataTable<T>({
           <tbody>
             {pageRows.map((row) => (
               <tr key={rowKey(row)}>
+                {selectionEnabled && (
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select row ${rowKey(row)}`}
+                      checked={selectedRowKeys.has(rowKey(row))}
+                      onChange={(event) => setSelected(rowKey(row), event.target.checked)}
+                    />
+                  </td>
+                )}
                 {columns.map((column) => (
                   <td key={column.key} className={column.className}>
                     {column.render
@@ -185,7 +228,7 @@ export default function DataTable<T>({
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={columns.length}>{emptyMessage}</td>
+                <td colSpan={columns.length + (selectionEnabled ? 1 : 0)}>{emptyMessage}</td>
               </tr>
             )}
           </tbody>

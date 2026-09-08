@@ -176,7 +176,13 @@ class Command(BaseCommand):
         }
 
     def _ensure_school(self, name, slug, domain, settings, subtype=None):
-        school, _ = School.objects.update_or_create(
+        music_lesson_subtypes = {'carnatic-music', 'hindustani-music'}
+        lesson_app = (
+            School.LessonApp.SUNAADAM
+            if subtype and subtype.slug in music_lesson_subtypes
+            else School.LessonApp.SIKSHAVAHINI
+        )
+        school, created = School.objects.update_or_create(
             slug=slug,
             defaults={
                 'name': name,
@@ -185,6 +191,9 @@ class Command(BaseCommand):
                 'is_active': True,
             },
         )
+        if created and school.lesson_app != lesson_app:
+            school.lesson_app = lesson_app
+            school.save(update_fields=['lesson_app'])
         SchoolSettings.objects.update_or_create(school=school, defaults=settings)
         return school
 

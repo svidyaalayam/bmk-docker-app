@@ -49,6 +49,11 @@ export function adminClassesPath(): string {
   return '/dashboard/admin/classes'
 }
 
+export function adminRequestsPath(): string { return '/dashboard/admin/requests' }
+export function adminCommunicationPath(): string { return '/dashboard/communicate-admin' }
+export function teacherCommunicationPath(): string { return '/dashboard/student/communicate-teacher' }
+export function teacherRequestsPath(): string { return '/dashboard/teacher/requests' }
+
 export function myClassesPath(role: UserRole): string {
   if (role === 'TEACHER') return '/dashboard/teacher/classes'
   if (role === 'STUDENT') return '/dashboard/student/classes'

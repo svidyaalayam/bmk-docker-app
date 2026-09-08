@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string
   readonly VITE_APP_DOMAIN?: string
+  readonly VITE_SIKSHAVAHINI_URL?: string
+  readonly VITE_SUNAADAM_URL?: string
   /** local | test | staging | production */
   readonly VITE_APP_ENV?: string
 }

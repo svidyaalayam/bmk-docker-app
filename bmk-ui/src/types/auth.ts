@@ -1,4 +1,5 @@
 export type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT'
+export type LessonApp = 'sikshavahini' | 'sunaadam'
 
 export interface User {
   id: number
@@ -11,9 +12,11 @@ export interface User {
   school_id: number | null
   school_slug: string | null
   school_name: string | null
+  lesson_app: LessonApp | null
   email_verified?: boolean
   is_active?: boolean
   profile_locked?: boolean
+  legacy_uid?: string | null
   date_joined?: string
   avatar_url?: string | null
 }

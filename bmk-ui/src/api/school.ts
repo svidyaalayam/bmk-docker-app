@@ -7,6 +7,19 @@ import type {
   UpdateTeacherPayload,
 } from '../types/school'
 
+export interface UserImportResult {
+  created_count: number
+  skipped_count: number
+  created_by_role: Record<'STUDENT' | 'TEACHER' | 'ADMIN', number>
+  password_note: string
+}
+
+export interface UserImportDuplicate {
+  row: number
+  email: string
+  reason: string
+}
+
 export async function listUsers(role?: string): Promise<User[]> {
   const { data } = await api.get<User[]>('/api/users/', {
     params: role ? { role } : undefined,
@@ -21,6 +34,18 @@ export async function listStudents(): Promise<StudentProfile[]> {
 
 export async function listTeachers(): Promise<TeacherProfile[]> {
   const { data } = await api.get<TeacherProfile[]>('/api/teachers/')
+  return data
+}
+
+export async function importFirebaseUsers(
+  file: File,
+  skipDuplicates = false,
+): Promise<UserImportResult> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const { data } = await api.post<UserImportResult>('/api/users/import/', formData, {
+    params: skipDuplicates ? { duplicate_action: 'skip' } : undefined,
+  })
   return data
 }
 

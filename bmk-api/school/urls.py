@@ -2,6 +2,7 @@ from django.urls import path
 
 from .class_views import (
     ClassSessionDetailView,
+    ClassCalendarImportView,
     ClassSessionListCreateView,
     ClassSessionStartView,
     SessionAttendanceListView,
@@ -17,8 +18,20 @@ from .class_views import (
     TeachingClassStudentRemoveView,
     TeachingClassStudentsView,
 )
+from .sikshavahini_views import (
+    SikshavahiniClassCatalogView,
+    SikshavahiniSchoolsCatalogView,
+    SunaadamClassCatalogView,
+    SunaadamSchoolsCatalogView,
+)
 from .views import (
     AdminUserCreateView,
+    AdminRequestDetailView,
+    AdminRequestListView,
+    StudentTeacherRequestView,
+    TeacherRequestDetailView,
+    TeacherRequestListView,
+    FirebaseUserImportView,
     HomepageContentView,
     SchoolListView,
     SchoolSettingsPublicView,
@@ -27,14 +40,42 @@ from .views import (
     TeacherDetailView,
     TeacherListView,
     UserListView,
+    UserAdminRequestView,
 )
 
 urlpatterns = [
     path('public/schools/', SchoolListView.as_view(), name='public-schools'),
     path('public/homepage/', HomepageContentView.as_view(), name='public-homepage'),
     path('public/school/', SchoolSettingsPublicView.as_view(), name='public-school-settings'),
+    path(
+        'sikshavahini/classes/',
+        SikshavahiniClassCatalogView.as_view(),
+        name='sikshavahini-classes',
+    ),
+    path(
+        'sikshavahini/schools/',
+        SikshavahiniSchoolsCatalogView.as_view(),
+        name='sikshavahini-schools',
+    ),
+    path(
+        'sunaadam/classes/',
+        SunaadamClassCatalogView.as_view(),
+        name='sunaadam-classes',
+    ),
+    path(
+        'sunaadam/schools/',
+        SunaadamSchoolsCatalogView.as_view(),
+        name='sunaadam-schools',
+    ),
     path('users/', UserListView.as_view(), name='user-list'),
     path('users/admins/', AdminUserCreateView.as_view(), name='admin-user-create'),
+    path('users/import/', FirebaseUserImportView.as_view(), name='firebase-user-import'),
+    path('admin-requests/', AdminRequestListView.as_view(), name='admin-request-list'),
+    path('admin-requests/<int:pk>/', AdminRequestDetailView.as_view(), name='admin-request-detail'),
+    path('my-admin-requests/', UserAdminRequestView.as_view(), name='user-admin-request'),
+    path('my-teacher-requests/', StudentTeacherRequestView.as_view(), name='student-teacher-request'),
+    path('teacher-requests/', TeacherRequestListView.as_view(), name='teacher-request-list'),
+    path('teacher-requests/<int:pk>/', TeacherRequestDetailView.as_view(), name='teacher-request-detail'),
     path('teachers/', TeacherListView.as_view(), name='teacher-list'),
     path('teachers/<int:pk>/', TeacherDetailView.as_view(), name='teacher-detail'),
     path('students/', StudentListView.as_view(), name='student-list'),
@@ -48,6 +89,7 @@ urlpatterns = [
         name='class-student-remove',
     ),
     path('classes/<int:pk>/sessions/', ClassSessionListCreateView.as_view(), name='class-sessions'),
+    path('classes/<int:pk>/calendar/import/', ClassCalendarImportView.as_view(), name='class-calendar-import'),
     path('sessions/<int:pk>/', ClassSessionDetailView.as_view(), name='session-detail'),
     path('sessions/<int:pk>/start/', ClassSessionStartView.as_view(), name='session-start'),
     path('sessions/<int:pk>/attendance/', SessionAttendanceListView.as_view(), name='session-attendance'),

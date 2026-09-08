@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   createClass,
@@ -6,6 +6,7 @@ import {
   deleteClass,
   deleteSession,
   getClass,
+  importCalendarDates,
   listClasses,
   updateClass,
   updateSession,
@@ -209,7 +210,10 @@ function ClassEditor({
   )
   const [newDate, setNewDate] = useState('')
   const [calendarError, setCalendarError] = useState('')
+  const [calendarMessage, setCalendarMessage] = useState('')
+  const [importingCalendar, setImportingCalendar] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const calendarFileRef = useRef<HTMLInputElement>(null)
 
   const studentById = useMemo(() => {
     const map = new Map<number, StudentProfile>()
@@ -384,6 +388,47 @@ function ClassEditor({
     }
   }
 
+  const handleExportCalendar = () => {
+    const dates = sessions.map((session) => session.session_date)
+    const payload = { dates }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${detail?.name || 'class'}-calendar-dates.json`.replace(/[^a-z0-9._-]/gi, '-')
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportCalendar = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !detail) return
+    setCalendarError('')
+    setCalendarMessage('')
+    setImportingCalendar(true)
+    try {
+      const parsed: unknown = JSON.parse(await file.text())
+      const dates =
+        typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { dates?: unknown }).dates)
+          ? (parsed as { dates: unknown[] }).dates
+          : null
+      if (!dates || !dates.every((date) => typeof date === 'string')) {
+        throw new Error('Choose a calendar JSON file exported from this page.')
+      }
+      const result = await importCalendarDates(detail.id, dates)
+      setSessions((previous) =>
+        [...previous, ...result.created].sort((a, b) => a.session_date.localeCompare(b.session_date)),
+      )
+      setCalendarMessage(
+        `Calendar import complete: ${result.created_count} date${result.created_count === 1 ? '' : 's'} added; ${result.skipped_count} existing or duplicate date${result.skipped_count === 1 ? '' : 's'} left unchanged.`,
+      )
+    } catch (err) {
+      setCalendarError(err instanceof Error ? err.message : getErrorMessage(err, 'Could not import calendar dates.'))
+    } finally {
+      if (calendarFileRef.current) calendarFileRef.current.value = ''
+      setImportingCalendar(false)
+    }
+  }
+
   return (
     <>
       <header className="modal-header">
@@ -516,6 +561,22 @@ function ClassEditor({
       {mode === 'edit' && detail && (
         <section className="modal-section">
           <h3>Calendar ({sessions.length} sessions)</h3>
+          <div className="form-actions">
+            <button type="button" className="home-btn secondary" onClick={handleExportCalendar}>
+              Export calendar dates
+            </button>
+            <label className="home-btn secondary">
+              {importingCalendar ? 'Importing…' : 'Import calendar dates'}
+              <input
+                ref={calendarFileRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={handleImportCalendar}
+                disabled={importingCalendar}
+                className="sr-only"
+              />
+            </label>
+          </div>
           <div className="inline-form">
             <input
               type="date"
@@ -530,9 +591,10 @@ function ClassEditor({
             </button>
           </div>
           {calendarError && <p className="error">{calendarError}</p>}
+          {calendarMessage && <p className="success">{calendarMessage}</p>}
           <p className="header-sub">
             Dates must be unique. Started sessions are locked — their date cannot be changed or
-            deleted. List is shown oldest → newest.
+            deleted. Importing leaves existing dates unchanged and does not add duplicates. List is shown oldest → newest.
           </p>
           <ul className="session-list">
             {sessions.map((s) => (

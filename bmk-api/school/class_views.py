@@ -1,5 +1,6 @@
 from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import permissions, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
@@ -331,6 +332,64 @@ class ClassSessionListCreateView(APIView):
             **serializer.validated_data,
         )
         return Response(ClassSessionSerializer(session).data, status=status.HTTP_201_CREATED)
+
+
+class ClassCalendarImportView(APIView):
+    """Admin-only, duplicate-safe calendar date import for one class."""
+
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            teaching_class = TeachingClass.objects.get(pk=pk, school=_school(request.user))
+        except TeachingClass.DoesNotExist:
+            return Response({'detail': 'Not found.'}, status=404)
+
+        dates = request.data.get('dates')
+        if not isinstance(dates, list):
+            return Response({'detail': 'Expected a JSON object with a dates array.'}, status=400)
+        if not dates:
+            return Response({'detail': 'The calendar file does not contain any dates.'}, status=400)
+        if len(dates) > 1000:
+            return Response({'detail': 'A maximum of 1,000 calendar dates can be imported at once.'}, status=400)
+
+        parsed_dates = []
+        errors = []
+        for row, value in enumerate(dates, start=1):
+            parsed = parse_date(str(value)) if isinstance(value, str) else None
+            if parsed is None:
+                errors.append({'row': row, 'error': 'Use the YYYY-MM-DD date format.'})
+            else:
+                parsed_dates.append(parsed)
+        if errors:
+            return Response({'detail': 'Correct the listed dates and import again.', 'errors': errors}, status=400)
+
+        existing_dates = set(teaching_class.sessions.values_list('session_date', flat=True))
+        seen_dates = set(existing_dates)
+        created = []
+        skipped = []
+        for row, session_date in enumerate(parsed_dates, start=1):
+            if session_date in seen_dates:
+                skipped.append({'row': row, 'date': session_date.isoformat()})
+                continue
+            session = ClassSession.objects.create(
+                teaching_class=teaching_class,
+                session_date=session_date,
+                created_by=request.user,
+                updated_by=request.user,
+            )
+            seen_dates.add(session_date)
+            created.append(session)
+
+        return Response(
+            {
+                'created_count': len(created),
+                'skipped_count': len(skipped),
+                'created': ClassSessionSerializer(created, many=True).data,
+                'skipped': skipped,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class ClassSessionDetailView(APIView):

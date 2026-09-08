@@ -45,8 +45,16 @@ class SchoolSubtypeAdmin(admin.ModelAdmin):
 
 @admin.register(School)
 class SchoolAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'subtype', 'domain', 'is_active', 'updated_at')
-    list_filter = ('is_active', 'subtype__school_type', 'subtype')
+    list_display = (
+        'name',
+        'slug',
+        'subtype',
+        'lesson_app',
+        'domain',
+        'is_active',
+        'updated_at',
+    )
+    list_filter = ('lesson_app', 'is_active', 'subtype__school_type', 'subtype')
     search_fields = ('name', 'slug', 'domain')
     autocomplete_fields = ('subtype',)
     inlines = [SchoolSettingsInline]

@@ -23,6 +23,7 @@ import {
 } from '../api/classes'
 import { useAuth } from '../auth/AuthContext'
 import SiteHeader from '../components/SiteHeader'
+import MediaCaptureUpload from '../components/MediaCaptureUpload'
 import type {
   AttendanceRecord,
   AttendanceStatus,
@@ -498,6 +499,7 @@ function SessionPanel({
       onMessage('Homework uploaded.')
     } catch (err) {
       onError(getErrorMessage(err, 'Could not upload homework.'))
+      throw err
     }
   }
 
@@ -522,6 +524,7 @@ function SessionPanel({
       onMessage(`${kind === 'CLASSWORK' ? 'Classwork' : 'Homework'} file uploaded.`)
     } catch (err) {
       onError(getErrorMessage(err, 'Could not upload file.'))
+      throw err
     }
   }
 
@@ -557,16 +560,11 @@ function SessionPanel({
           <div className="full material-block">
             <h3>Classwork files</h3>
             {isTeacher && (
-              <label className="file-upload">
-                Add classwork file
-                <input
-                  type="file"
-                  onChange={(e) => {
-                    handleMaterialUpload('CLASSWORK', e.target.files?.[0] || null)
-                    e.target.value = ''
-                  }}
-                />
-              </label>
+              <MediaCaptureUpload
+                label="Choose classwork file"
+                maxBytes={20 * 1024 * 1024}
+                onUpload={(file) => handleMaterialUpload('CLASSWORK', file)}
+              />
             )}
             <ul className="material-list">
               {classworkMaterials.map((m) => (
@@ -607,16 +605,11 @@ function SessionPanel({
           <div className="full material-block">
             <h3>Homework files (from teacher)</h3>
             {isTeacher && (
-              <label className="file-upload">
-                Add homework file
-                <input
-                  type="file"
-                  onChange={(e) => {
-                    handleMaterialUpload('HOMEWORK', e.target.files?.[0] || null)
-                    e.target.value = ''
-                  }}
-                />
-              </label>
+              <MediaCaptureUpload
+                label="Choose homework file"
+                maxBytes={20 * 1024 * 1024}
+                onUpload={(file) => handleMaterialUpload('HOMEWORK', file)}
+              />
             )}
             <ul className="material-list">
               {homeworkMaterials.map((m) => (
@@ -848,14 +841,11 @@ function SessionPanel({
 
       <h3>Your homework submissions</h3>
       {isStudent && (
-        <label className="file-upload">
-          Upload homework (image / PDF / audio)
-          <input
-            type="file"
-            accept="image/*,application/pdf,audio/*"
-            onChange={(e) => handleUpload(e.target.files?.[0] || null)}
-          />
-        </label>
+        <MediaCaptureUpload
+          label="Choose homework file"
+          maxBytes={10 * 1024 * 1024}
+          onUpload={handleUpload}
+        />
       )}
 
       <ul className="homework-list">

@@ -3,7 +3,6 @@ import { useAuth } from '../auth/AuthContext'
 import { useSchoolContent } from '../content/SchoolContentContext'
 import HeaderUser from './HeaderUser'
 import {
-  adminUsersPath,
   dashboardPathForRole,
   schoolHomePath,
   schoolLoginPath,
@@ -23,6 +22,12 @@ export default function SiteHeader() {
   const { school, schoolSlug } = useSchoolContent()
   const schoolName = school.school_name || schoolSlug
   const mark = brandMark(schoolName)
+  // Match ProtectedRoute: allow users with no school_slug yet, or matching school
+  const onSchool =
+    !loading &&
+    !!user &&
+    !!schoolSlug &&
+    (!user.school_slug || user.school_slug === schoolSlug)
 
   return (
     <header className="site-header">
@@ -55,21 +60,12 @@ export default function SiteHeader() {
           Home
         </NavLink>
 
-        {!loading && user && user.school_slug === schoolSlug && (
+        {onSchool && user && (
           <NavLink
             to={dashboardPathForRole(user.role)}
             className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
           >
             Dashboard
-          </NavLink>
-        )}
-
-        {!loading && user?.role === 'ADMIN' && user.school_slug === schoolSlug && (
-          <NavLink
-            to={adminUsersPath()}
-            className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-          >
-            Manage users
           </NavLink>
         )}
       </nav>

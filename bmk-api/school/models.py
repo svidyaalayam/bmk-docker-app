@@ -50,6 +50,10 @@ class SchoolSubtype(models.Model):
 class School(models.Model):
     """A tenant school in the multi-school platform."""
 
+    class LessonApp(models.TextChoices):
+        SIKSHAVAHINI = 'sikshavahini', 'Sikshavahini'
+        SUNAADAM = 'sunaadam', 'Sunaadam'
+
     name = models.CharField(max_length=200)
     # Host prefix under APP_DOMAIN — may include dots, e.g. uk.telugu → uk.telugu.localhost
     slug = models.CharField(
@@ -68,6 +72,12 @@ class School(models.Model):
         null=True,
         blank=True,
         related_name='schools',
+    )
+    lesson_app = models.CharField(
+        max_length=20,
+        choices=LessonApp.choices,
+        default=LessonApp.SIKSHAVAHINI,
+        help_text='Lesson application opened for users of this school.',
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -485,3 +495,46 @@ class ClassSessionHomework(AuditModel):
 
     def __str__(self):
         return f'Homework {self.id} — session {self.session_id} student {self.student_id}'
+
+
+class AdminRequest(models.Model):
+    class Kind(models.TextChoices):
+        REQUEST = 'REQUEST', 'Request'
+        FEEDBACK = 'FEEDBACK', 'Feedback / suggestion'
+
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='admin_requests')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='admin_requests')
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    reply = models.TextField(blank=True)
+    replied_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='admin_request_replies')
+    resolved = models.BooleanField(default=False)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+
+class StudentTeacherRequest(models.Model):
+    class Kind(models.TextChoices):
+        REQUEST = 'REQUEST', 'Request'
+        FEEDBACK = 'FEEDBACK', 'Feedback / suggestion'
+
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='student_teacher_requests')
+    teaching_class = models.ForeignKey(TeachingClass, on_delete=models.CASCADE, related_name='student_teacher_requests')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='teacher_requests')
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    reply = models.TextField(blank=True)
+    replied_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='student_teacher_request_replies')
+    resolved = models.BooleanField(default=False)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']

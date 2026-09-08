@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import { fetchDashboard } from '../api/auth'
 import { useAuth } from '../auth/AuthContext'
 import SiteHeader from '../components/SiteHeader'
+import SikshavahiniButton from '../components/SikshavahiniButton'
 import { useSchoolContent } from '../content/SchoolContentContext'
 import type { DashboardPayload } from '../types/auth'
-import { adminClassesPath, adminUsersPath, myClassesPath } from '../utils/routes'
+import { adminClassesPath, adminCommunicationPath, adminRequestsPath, adminUsersPath, myClassesPath, teacherCommunicationPath, teacherRequestsPath } from '../utils/routes'
 
 const ROLE_LABELS = {
   ADMIN: 'Administrator',
@@ -61,25 +62,33 @@ export default function DashboardPage() {
           )}
 
           {user.role === 'ADMIN' && (
-            <p className="admin-cta">
+            <section className="admin-cta">
               {typeof payload?.pending_activations === 'number' &&
                 payload.pending_activations > 0 && (
-                  <>
+                  <p>
                     {payload.pending_activations} user
-                    {payload.pending_activations === 1 ? '' : 's'} waiting for activation.{' '}
-                  </>
+                    {payload.pending_activations === 1 ? '' : 's'} waiting for activation.
+                  </p>
                 )}
-              <Link to={adminUsersPath()}>Open user management →</Link>
-              {' · '}
-              <Link to={adminClassesPath()}>Open class management →</Link>
-            </p>
+              <div className="home-actions">
+                <Link to={adminUsersPath()} className="home-btn">
+                  Manage Users
+                </Link>
+                <Link to={adminClassesPath()} className="home-btn secondary">
+                  Manage Classes
+                </Link>
+                <Link to={adminRequestsPath()} className="home-btn secondary">User Requests</Link>
+              </div>
+            </section>
           )}
 
           {(user.role === 'TEACHER' || user.role === 'STUDENT') && (
-            <p className="admin-cta">
-              <Link to={myClassesPath(user.role)}>Open my classes →</Link>
-            </p>
+            <div className="home-actions"><Link to={adminCommunicationPath()} className="home-btn">Communicate with the admin team</Link>{user.role === 'STUDENT' && <Link to={teacherCommunicationPath()} className="home-btn secondary">Communicate with your teacher</Link>}{user.role === 'TEACHER' && <Link to={teacherRequestsPath()} className="home-btn secondary">Student Requests</Link>}</div>
           )}
+
+          <p className="admin-cta siksha-cta">
+            <SikshavahiniButton className="home-btn" />
+          </p>
         </section>
       </div>
     </div>

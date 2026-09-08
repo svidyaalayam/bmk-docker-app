@@ -3,7 +3,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from authentication.serializers import UserSerializer
-from .models import Course, CourseClass, School, SchoolSettings, SchoolSubtype, SchoolType, Student, Teacher
+from .models import AdminRequest, Course, CourseClass, School, SchoolSettings, SchoolSubtype, SchoolType, Student, StudentTeacherRequest, Teacher
 
 User = get_user_model()
 
@@ -150,8 +150,28 @@ class HomepageContentSerializer(serializers.Serializer):
     courses = CourseSerializer(many=True)
 
 
+class AdminRequestSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    replied_by_name = serializers.CharField(source='replied_by.username', read_only=True, default=None)
+
+    class Meta:
+        model = AdminRequest
+        fields = ('id', 'user', 'kind', 'subject', 'message', 'reply', 'replied_by_name', 'resolved', 'resolved_at', 'created_at', 'updated_at')
+
+
+class StudentTeacherRequestSerializer(serializers.ModelSerializer):
+    student = UserSerializer(source='student.user', read_only=True)
+    class_name = serializers.CharField(source='teaching_class.name', read_only=True)
+    replied_by_name = serializers.CharField(source='replied_by.username', read_only=True, default=None)
+
+    class Meta:
+        model = StudentTeacherRequest
+        fields = ('id', 'student', 'teaching_class', 'class_name', 'kind', 'subject', 'message', 'reply', 'replied_by_name', 'resolved', 'resolved_at', 'created_at', 'updated_at')
+
+
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    class_assignment_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Student
@@ -168,12 +188,14 @@ class StudentSerializer(serializers.ModelSerializer):
             'is_active',
             'created_at',
             'updated_at',
+            'class_assignment_count',
         )
         read_only_fields = ('id', 'user', 'is_active', 'created_at', 'updated_at')
 
 
 class TeacherSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    class_assignment_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Teacher
@@ -185,6 +207,7 @@ class TeacherSerializer(serializers.ModelSerializer):
             'is_active',
             'created_at',
             'updated_at',
+            'class_assignment_count',
         )
         read_only_fields = ('id', 'user', 'is_active', 'created_at', 'updated_at')
 

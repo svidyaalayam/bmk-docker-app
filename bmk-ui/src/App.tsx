@@ -8,6 +8,9 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import AdminClassesPage from './pages/AdminClassesPage'
+import AdminRequestsPage from './pages/AdminRequestsPage'
+import CommunicationsPage from './pages/CommunicationsPage'
+import TeacherRequestsPage from './pages/TeacherRequestsPage'
 import MyClassesPage from './pages/MyClassesPage'
 import ClassDetailPage from './pages/ClassDetailPage'
 import SchoolPickerPage from './pages/SchoolPickerPage'
@@ -42,22 +45,26 @@ function SchoolRoutes({ schoolSlug }: { schoolSlug: string }) {
 
         <Route element={<ProtectedRoute />}>
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="dashboard/communicate-admin" element={<CommunicationsPage target="admin" />} />
         </Route>
 
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route path="dashboard/admin" element={<DashboardPage />} />
           <Route path="dashboard/admin/users" element={<AdminUsersPage />} />
           <Route path="dashboard/admin/classes" element={<AdminClassesPage />} />
+          <Route path="dashboard/admin/requests" element={<AdminRequestsPage />} />
         </Route>
         <Route element={<ProtectedRoute roles={['TEACHER']} />}>
           <Route path="dashboard/teacher" element={<DashboardPage />} />
           <Route path="dashboard/teacher/classes" element={<MyClassesPage />} />
           <Route path="dashboard/teacher/classes/:classId" element={<ClassDetailPage />} />
+          <Route path="dashboard/teacher/requests" element={<TeacherRequestsPage />} />
         </Route>
         <Route element={<ProtectedRoute roles={['STUDENT']} />}>
           <Route path="dashboard/student" element={<DashboardPage />} />
           <Route path="dashboard/student/classes" element={<MyClassesPage />} />
           <Route path="dashboard/student/classes/:classId" element={<ClassDetailPage />} />
+          <Route path="dashboard/student/communicate-teacher" element={<CommunicationsPage target="teacher" />} />
         </Route>
 
         <Route path="dashboard" element={<DashboardRedirect />} />

@@ -26,6 +26,13 @@ class User(AbstractUser):
         default=False,
         help_text='True after the user confirms their email address.',
     )
+    legacy_uid = models.CharField(
+        max_length=128,
+        blank=True,
+        null=True,
+        unique=True,
+        help_text='Firebase UID retained when an account is imported from the legacy system.',
+    )
     profile_locked = models.BooleanField(
         default=False,
         help_text='When True, registration details cannot be changed by the user.',
