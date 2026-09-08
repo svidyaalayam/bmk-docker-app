@@ -11,6 +11,8 @@ from .models import (
     CourseClass,
     School,
     SchoolSettings,
+    SchoolSubtype,
+    SchoolType,
     Student,
     Teacher,
     TeachingClass,
@@ -23,12 +25,30 @@ class SchoolSettingsInline(admin.StackedInline):
     extra = 0
 
 
+@admin.register(SchoolType)
+class SchoolTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'display_order', 'is_active')
+    list_editable = ('display_order', 'is_active')
+    prepopulated_fields = {'slug': ('name',)}
+    search_fields = ('name', 'slug')
+
+
+@admin.register(SchoolSubtype)
+class SchoolSubtypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'school_type', 'slug', 'display_order', 'is_active')
+    list_filter = ('school_type', 'is_active')
+    list_editable = ('display_order', 'is_active')
+    prepopulated_fields = {'slug': ('name',)}
+    search_fields = ('name', 'slug', 'school_type__name')
+    autocomplete_fields = ('school_type',)
+
+
 @admin.register(School)
 class SchoolAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'domain', 'is_active', 'updated_at')
-    list_filter = ('is_active',)
+    list_display = ('name', 'slug', 'subtype', 'domain', 'is_active', 'updated_at')
+    list_filter = ('is_active', 'subtype__school_type', 'subtype')
     search_fields = ('name', 'slug', 'domain')
-    prepopulated_fields = {'slug': ('name',)}
+    autocomplete_fields = ('subtype',)
     inlines = [SchoolSettingsInline]
 
 
@@ -198,6 +218,6 @@ class ClassSessionHomeworkAdmin(admin.ModelAdmin):
 
 @admin.register(ClassSessionMaterial)
 class ClassSessionMaterialAdmin(admin.ModelAdmin):
-    list_display = ('session', 'kind', 'original_filename', 'created_at')
-    list_filter = ('kind',)
+    list_display = ('session', 'kind', 'original_filename', 'storage_backend', 'created_at')
+    list_filter = ('kind', 'storage_backend')
     raw_id_fields = ('session', 'created_by', 'updated_by')

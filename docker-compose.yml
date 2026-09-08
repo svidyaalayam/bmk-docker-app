@@ -20,7 +20,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-docker-dev-only}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,.localhost,api,web}
-      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost,http://127.0.0.1,http://localhost:80,http://localhost:8080,http://127.0.0.1:8080,http://balamukundam.localhost:8080,http://balavikas.localhost:8080}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost,http://127.0.0.1,http://localhost:80,http://localhost:8080,http://127.0.0.1:8080,http://uk.telugu.localhost:8080,http://balavikas.localhost:8080}
       CORS_ALLOW_ALL_ORIGINS: ${CORS_ALLOW_ALL_ORIGINS:-false}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://127.0.0.1,http://localhost:8080,http://127.0.0.1:8080}
       CORS_ALLOWED_ORIGIN_REGEXES: ${CORS_ALLOWED_ORIGIN_REGEXES:-^http://([a-z0-9-]+\.)?localhost(:\d+)?$}
@@ -42,6 +42,12 @@ services:
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Balamukundam Vidyalayam <noreply@balamukundam.com>}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}
       FRONTEND_PORT: ${FRONTEND_PORT:-}
+      HOMEWORK_STORAGE_BACKEND: ${HOMEWORK_STORAGE_BACKEND:-local}
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_ACCOUNT_NAME: ${AZURE_STORAGE_ACCOUNT_NAME:-}
+      AZURE_STORAGE_ACCOUNT_KEY: ${AZURE_STORAGE_ACCOUNT_KEY:-}
+      AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-bmk-homework}
+      AZURE_BLOB_SAS_EXPIRY_HOURS: ${AZURE_BLOB_SAS_EXPIRY_HOURS:-24}
     volumes:
       - media_data:/app/media
     depends_on:

@@ -5,7 +5,10 @@ from .models import School
 
 
 def _slug_from_host(host: str) -> str:
-    """balavikas.localhost / balavikas.x.x.x.x.nip.io → balavikas"""
+    """
+    uk.telugu.localhost / balavikas.x.x.x.x.nip.io → uk.telugu / balavikas
+    Multi-label prefixes are allowed (type/region nesting).
+    """
     from django.conf import settings
 
     hostname = (host or '').split(':')[0].strip().lower()
@@ -25,7 +28,7 @@ def _slug_from_host(host: str) -> str:
             return ''
         if hostname.endswith(suffix):
             sub = hostname[: -len(suffix)]
-            if sub and '.' not in sub:
+            if sub:
                 return sub
     return ''
 
@@ -35,7 +38,7 @@ def resolve_school(request, required=True):
     Resolve tenant school from:
     1) ?school=<slug> query param
     2) X-School-Slug header
-    3) Host subdomain prefix (balavikas.localhost)
+    3) Host subdomain prefix (uk.telugu.localhost)
     4) School.domain match
     5) request.user.school for authenticated users
     """

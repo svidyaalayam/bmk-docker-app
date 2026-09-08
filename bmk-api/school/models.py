@@ -2,19 +2,72 @@ from django.contrib.auth import get_user_model
 from django.db import models
 
 from core.models import AuditModel
+from school.storage import (
+    select_homework_storage,
+    session_material_upload_to,
+    student_homework_upload_to,
+)
 
 User = get_user_model()
+
+
+class SchoolType(models.Model):
+    """Top-level programme category on the platform home (e.g. Language, Music)."""
+
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=50, unique=True)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+class SchoolSubtype(models.Model):
+    """Subtype under a school type (e.g. Telugu under Language schools)."""
+
+    school_type = models.ForeignKey(
+        SchoolType,
+        on_delete=models.CASCADE,
+        related_name='subtypes',
+    )
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=50)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'name']
+        unique_together = ('school_type', 'slug')
+
+    def __str__(self):
+        return f'{self.school_type.name} → {self.name}'
 
 
 class School(models.Model):
     """A tenant school in the multi-school platform."""
 
     name = models.CharField(max_length=200)
-    slug = models.SlugField(max_length=100, unique=True)
+    # Host prefix under APP_DOMAIN — may include dots, e.g. uk.telugu → uk.telugu.localhost
+    slug = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text='Host prefix under the app domain, e.g. uk.telugu or balamukundam',
+    )
     domain = models.CharField(
         max_length=255,
         blank=True,
-        help_text='Optional custom domain, e.g. balamukundam.org',
+        help_text='Optional full hostname override, e.g. uk.telugu.balamukundam.com',
+    )
+    subtype = models.ForeignKey(
+        SchoolSubtype,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='schools',
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -25,6 +78,16 @@ class School(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def type_name(self) -> str:
+        if self.subtype_id and self.subtype:
+            return self.subtype.school_type.name
+        return ''
+
+    @property
+    def subtype_name(self) -> str:
+        return self.subtype.name if self.subtype_id and self.subtype else ''
 
 
 class SchoolSettings(models.Model):
@@ -291,9 +354,23 @@ class ClassSessionMaterial(AuditModel):
         related_name='materials',
     )
     kind = models.CharField(max_length=16, choices=Kind.choices)
-    file = models.FileField(upload_to='session_materials/%Y/%m/')
+    file = models.FileField(
+        upload_to=session_material_upload_to,
+        storage=select_homework_storage,
+        blank=True,
+    )
     original_filename = models.CharField(max_length=255, blank=True)
     content_type = models.CharField(max_length=100, blank=True)
+    storage_backend = models.CharField(
+        max_length=32,
+        default='local',
+        help_text='local or azure_blob',
+    )
+    storage_uri = models.CharField(
+        max_length=1000,
+        blank=True,
+        help_text='Blob URL or local media path reference.',
+    )
 
     class Meta:
         ordering = ['kind', 'created_at', 'id']
@@ -365,7 +442,7 @@ class ClassSessionComment(AuditModel):
 
 
 class ClassSessionHomework(AuditModel):
-    """Homework submission for a session+student. Local files now; blob/AI later."""
+    """Homework submission for a session+student. Local or Azure Blob."""
 
     session = models.ForeignKey(
         ClassSession,
@@ -377,18 +454,22 @@ class ClassSessionHomework(AuditModel):
         on_delete=models.CASCADE,
         related_name='homework_submissions',
     )
-    file = models.FileField(upload_to='homework/%Y/%m/', blank=True)
+    file = models.FileField(
+        upload_to=student_homework_upload_to,
+        storage=select_homework_storage,
+        blank=True,
+    )
     original_filename = models.CharField(max_length=255, blank=True)
     content_type = models.CharField(max_length=100, blank=True)
     storage_backend = models.CharField(
         max_length=32,
         default='local',
-        help_text='local now; azure_blob later',
+        help_text='local or azure_blob',
     )
     storage_uri = models.CharField(
-        max_length=500,
+        max_length=1000,
         blank=True,
-        help_text='Future blob URI when storage_backend is azure_blob.',
+        help_text='Stable blob/object name or local media path (not a SAS URL).',
     )
     teacher_feedback = models.TextField(blank=True)
     ai_evaluation_status = models.CharField(

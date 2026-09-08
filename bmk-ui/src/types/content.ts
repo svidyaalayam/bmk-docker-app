@@ -45,6 +45,33 @@ export interface SchoolSummary {
   slug: string
   domain: string
   logo_url: string | null
+  type_slug?: string | null
+  type_name?: string | null
+  type_display_order?: number
+  subtype_slug?: string | null
+  subtype_name?: string | null
+  subtype_display_order?: number
+}
+
+export interface SchoolCatalogSubtype {
+  id: number
+  name: string
+  slug: string
+  display_order: number
+  schools: SchoolSummary[]
+}
+
+export interface SchoolCatalogType {
+  id: number
+  name: string
+  slug: string
+  display_order: number
+  subtypes: SchoolCatalogSubtype[]
+}
+
+export interface SchoolCatalogResponse {
+  schools: SchoolSummary[]
+  catalog: SchoolCatalogType[]
 }
 
 

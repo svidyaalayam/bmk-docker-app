@@ -6,9 +6,10 @@ from rest_framework.views import APIView
 
 from authentication.permissions import IsAdminRole
 from authentication.serializers import UserSerializer
-from .models import Course, CourseClass, School, Student, Teacher
+from .models import Course, CourseClass, School, SchoolSettings, SchoolSubtype, SchoolType, Student, Teacher
 from .serializers import (
     HomepageContentSerializer,
+    SchoolCatalogSerializer,
     SchoolSerializer,
     SchoolSettingsSerializer,
     StudentSerializer,
@@ -26,8 +27,31 @@ class SchoolListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        schools = School.objects.filter(is_active=True).select_related('settings')
-        return Response(SchoolSerializer(schools, many=True).data)
+        """Flat list (legacy) plus hierarchical catalog for the platform picker."""
+        schools = School.objects.filter(is_active=True).select_related(
+            'settings',
+            'subtype__school_type',
+        )
+        types = (
+            SchoolType.objects.filter(is_active=True)
+            .prefetch_related(
+                Prefetch(
+                    'subtypes',
+                    queryset=SchoolSubtype.objects.filter(is_active=True).prefetch_related(
+                        Prefetch(
+                            'schools',
+                            queryset=School.objects.filter(is_active=True).select_related('settings'),
+                        )
+                    ),
+                )
+            )
+        )
+        return Response(
+            {
+                'schools': SchoolSerializer(schools, many=True).data,
+                'catalog': SchoolCatalogSerializer(types, many=True).data,
+            }
+        )
 
 
 class HomepageContentView(APIView):

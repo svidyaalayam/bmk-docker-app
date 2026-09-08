@@ -59,11 +59,11 @@ _base_csrf = [
     'http://127.0.0.1:8080',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    'http://balamukundam.localhost',
+    'http://uk.telugu.localhost',
     'http://balavikas.localhost',
-    'http://balamukundam.localhost:80',
+    'http://uk.telugu.localhost:80',
     'http://balavikas.localhost:80',
-    'http://balamukundam.localhost:8080',
+    'http://uk.telugu.localhost:8080',
     'http://balavikas.localhost:8080',
 ]
 CSRF_TRUSTED_ORIGINS = list(
@@ -97,13 +97,11 @@ MIDDLEWARE = [
 ]
 
 # WhiteNoise is required in Docker; optional for local runserver if not installed yet.
-try:
-    import whitenoise  # noqa: F401
+import importlib.util
 
+_WHITENOISE = importlib.util.find_spec('whitenoise') is not None
+if _WHITENOISE:
     MIDDLEWARE.insert(2, 'whitenoise.middleware.WhiteNoiseMiddleware')
-    _WHITENOISE = True
-except ImportError:
-    _WHITENOISE = False
 
 
 ROOT_URLCONF = 'bmk_api_project.urls'
@@ -181,15 +179,53 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Reasonable avatar upload limit (UI + API enforce this).
 MAX_AVATAR_BYTES = int(os.environ.get('MAX_AVATAR_BYTES', str(100 * 1024)))  # 100 KB
 
+# Homework / teacher session materials: local (Docker volume) or azure_blob
+HOMEWORK_STORAGE_BACKEND = os.environ.get('HOMEWORK_STORAGE_BACKEND', 'local').strip().lower()
+AZURE_STORAGE_CONNECTION_STRING = os.environ.get('AZURE_STORAGE_CONNECTION_STRING', '').strip()
+AZURE_STORAGE_ACCOUNT_NAME = os.environ.get('AZURE_STORAGE_ACCOUNT_NAME', '').strip()
+AZURE_STORAGE_ACCOUNT_KEY = os.environ.get('AZURE_STORAGE_ACCOUNT_KEY', '').strip()
+AZURE_STORAGE_CONTAINER = os.environ.get('AZURE_STORAGE_CONTAINER', 'bmk-homework').strip() or 'bmk-homework'
+AZURE_BLOB_SAS_EXPIRY_HOURS = int(os.environ.get('AZURE_BLOB_SAS_EXPIRY_HOURS', '24'))
+
+_storages: dict = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+}
 if _WHITENOISE:
-    STORAGES = {
-        'default': {
-            'BACKEND': 'django.core.files.storage.FileSystemStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
-        },
+    _storages['staticfiles'] = {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
     }
+else:
+    _storages['staticfiles'] = {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    }
+
+_azure_ready = bool(
+    AZURE_STORAGE_CONNECTION_STRING
+    or (AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_ACCOUNT_KEY)
+)
+if HOMEWORK_STORAGE_BACKEND == 'azure_blob' and _azure_ready:
+    _azure_options: dict = {
+        'azure_container': AZURE_STORAGE_CONTAINER,
+        'expiration_secs': max(AZURE_BLOB_SAS_EXPIRY_HOURS, 1) * 3600,
+        'overwrite_files': False,
+        'timeout': 60,
+    }
+    if AZURE_STORAGE_CONNECTION_STRING:
+        _azure_options['connection_string'] = AZURE_STORAGE_CONNECTION_STRING
+    else:
+        _azure_options['account_name'] = AZURE_STORAGE_ACCOUNT_NAME
+        _azure_options['account_key'] = AZURE_STORAGE_ACCOUNT_KEY
+    _storages['azure_homework'] = {
+        'BACKEND': 'storages.backends.azure_storage.AzureStorage',
+        'OPTIONS': _azure_options,
+    }
+elif HOMEWORK_STORAGE_BACKEND == 'azure_blob' and not _azure_ready:
+    # Misconfigured Azure — keep local so the app still boots; uploads stay on volume.
+    HOMEWORK_STORAGE_BACKEND = 'local'
+
+STORAGES = _storages
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

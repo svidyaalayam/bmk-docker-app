@@ -12,6 +12,7 @@ from .models import (
     Teacher,
     TeachingClass,
 )
+from .storage import file_access_url
 
 User = get_user_model()
 
@@ -364,10 +365,7 @@ class ClassSessionHomeworkSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_file_url(self, obj):
-        if not obj.file:
-            return obj.storage_uri or None
-        # Relative /media/... path works with Vite/Nginx proxies.
-        return obj.file.url
+        return file_access_url(obj)
 
 
 class HomeworkFeedbackSerializer(serializers.ModelSerializer):
@@ -388,12 +386,12 @@ class ClassSessionMaterialSerializer(serializers.ModelSerializer):
             'original_filename',
             'content_type',
             'file_url',
+            'storage_backend',
+            'storage_uri',
             'created_at',
             'updated_at',
         )
         read_only_fields = fields
 
     def get_file_url(self, obj):
-        if not obj.file:
-            return None
-        return obj.file.url
+        return file_access_url(obj)

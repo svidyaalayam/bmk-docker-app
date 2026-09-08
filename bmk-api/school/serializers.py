@@ -3,12 +3,68 @@ from django.db import transaction
 from rest_framework import serializers
 
 from authentication.serializers import UserSerializer
-from .models import Course, CourseClass, School, SchoolSettings, Student, Teacher
+from .models import Course, CourseClass, School, SchoolSettings, SchoolSubtype, SchoolType, Student, Teacher
 
 User = get_user_model()
 
 
 class SchoolSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+    type_slug = serializers.SerializerMethodField()
+    type_name = serializers.SerializerMethodField()
+    subtype_slug = serializers.SerializerMethodField()
+    subtype_name = serializers.SerializerMethodField()
+    type_display_order = serializers.SerializerMethodField()
+    subtype_display_order = serializers.SerializerMethodField()
+
+    class Meta:
+        model = School
+        fields = (
+            'id',
+            'name',
+            'slug',
+            'domain',
+            'logo_url',
+            'type_slug',
+            'type_name',
+            'type_display_order',
+            'subtype_slug',
+            'subtype_name',
+            'subtype_display_order',
+        )
+
+    def get_logo_url(self, obj):
+        settings = getattr(obj, 'settings', None)
+        if not settings or not settings.logo:
+            return None
+        return settings.logo.url
+
+    def get_type_slug(self, obj):
+        if obj.subtype_id and obj.subtype:
+            return obj.subtype.school_type.slug
+        return None
+
+    def get_type_name(self, obj):
+        if obj.subtype_id and obj.subtype:
+            return obj.subtype.school_type.name
+        return None
+
+    def get_type_display_order(self, obj):
+        if obj.subtype_id and obj.subtype:
+            return obj.subtype.school_type.display_order
+        return 999
+
+    def get_subtype_slug(self, obj):
+        return obj.subtype.slug if obj.subtype_id and obj.subtype else None
+
+    def get_subtype_name(self, obj):
+        return obj.subtype.name if obj.subtype_id and obj.subtype else None
+
+    def get_subtype_display_order(self, obj):
+        return obj.subtype.display_order if obj.subtype_id and obj.subtype else 999
+
+
+class SchoolCatalogSchoolSerializer(serializers.ModelSerializer):
     logo_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -20,6 +76,22 @@ class SchoolSerializer(serializers.ModelSerializer):
         if not settings or not settings.logo:
             return None
         return settings.logo.url
+
+
+class SchoolCatalogSubtypeSerializer(serializers.ModelSerializer):
+    schools = SchoolCatalogSchoolSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SchoolSubtype
+        fields = ('id', 'name', 'slug', 'display_order', 'schools')
+
+
+class SchoolCatalogSerializer(serializers.ModelSerializer):
+    subtypes = SchoolCatalogSubtypeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SchoolType
+        fields = ('id', 'name', 'slug', 'display_order', 'subtypes')
 
 
 class CourseClassSerializer(serializers.ModelSerializer):

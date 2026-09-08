@@ -31,6 +31,7 @@ from .models import (
     Student,
     TeachingClass,
 )
+from .storage import apply_storage_metadata, delete_stored_file, homework_storage_backend_name
 
 ALLOWED_HOMEWORK_TYPES = {
     'image/jpeg',
@@ -699,10 +700,11 @@ class SessionHomeworkListCreateView(APIView):
             file=upload,
             original_filename=getattr(upload, 'name', '')[:255],
             content_type=content_type[:100],
-            storage_backend='local',
+            storage_backend=homework_storage_backend_name(),
             created_by=request.user,
             updated_by=request.user,
         )
+        apply_storage_metadata(hw)
         return Response(
             ClassSessionHomeworkSerializer(hw, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
@@ -798,9 +800,11 @@ class SessionMaterialListCreateView(APIView):
             file=upload,
             original_filename=getattr(upload, 'name', '')[:255],
             content_type=content_type[:100],
+            storage_backend=homework_storage_backend_name(),
             created_by=request.user,
             updated_by=request.user,
         )
+        apply_storage_metadata(material)
         return Response(
             ClassSessionMaterialSerializer(material, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
@@ -827,7 +831,6 @@ class SessionMaterialDetailView(APIView):
         ):
             return Response({'detail': 'Not allowed.'}, status=403)
 
-        if material.file:
-            material.file.delete(save=False)
+        delete_stored_file(material)
         material.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
