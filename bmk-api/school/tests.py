@@ -1,4 +1,5 @@
 import json
+from datetime import timezone as datetime_timezone
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -6,6 +7,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from .models import School, Student
+from authentication.usernames import username_for_school_email
 
 
 User = get_user_model()
@@ -44,6 +46,8 @@ class FirebaseUserImportViewTests(TestCase):
                         'phoneNumber': None,
                         'disabled': False,
                         'emailVerified': True,
+                        'creationTime': 'Tue, 03 Sep 2024 19:02:54 GMT',
+                        'lastSignInTime': 'Wed, 04 Sep 2024 09:12:10 GMT',
                     },
                     'firestore': {
                         'loginid': 'ssmaruvada@gmail.com',
@@ -62,12 +66,17 @@ class FirebaseUserImportViewTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['created_count'], 1)
-        user = User.objects.get(username='ssmaruvada@gmail.com')
+        user = User.objects.get(school=self.school, email='ssmaruvada@gmail.com')
+        self.assertEqual(user.username, username_for_school_email(user.email, self.school))
+        self.assertIn(f'--{self.school.school_number}@', user.username)
         student = Student.objects.get(user=user)
         self.assertEqual(user.legacy_uid, '038046mLu2YVOa9eQjWwRK42k4d2')
         self.assertEqual(user.role, User.Roles.STUDENT)
         self.assertTrue(user.email_verified)
         self.assertTrue(user.is_active)
+        self.assertEqual(user.date_joined.year, 2024)
+        self.assertEqual(user.date_joined.tzinfo, datetime_timezone.utc)
+        self.assertEqual(user.last_login.year, 2024)
         self.assertFalse(user.has_usable_password())
         self.assertEqual(student.gender, Student.Gender.BOY)
         self.assertEqual(student.parent_name, 'Parent Name')
@@ -107,7 +116,7 @@ class FirebaseUserImportViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-        user = User.objects.get(username='legacy.admin@example.com')
+        user = User.objects.get(school=self.school, email='legacy.admin@example.com')
         self.assertEqual(user.role, User.Roles.ADMIN)
         self.assertFalse(hasattr(user, 'student_profile'))
         self.assertFalse(hasattr(user, 'teacher_profile'))
@@ -137,13 +146,13 @@ class FirebaseUserImportViewTests(TestCase):
         confirmation = self.upload(records)
         self.assertEqual(confirmation.status_code, 409)
         self.assertEqual(confirmation.data['duplicate_count'], 1)
-        self.assertFalse(User.objects.filter(username='new@example.com').exists())
+        self.assertFalse(User.objects.filter(school=self.school, email='new@example.com').exists())
 
         completed = self.upload(records, skip_duplicates=True)
         self.assertEqual(completed.status_code, 201)
         self.assertEqual(completed.data['created_count'], 1)
         self.assertEqual(completed.data['skipped_count'], 1)
-        self.assertTrue(User.objects.filter(username='new@example.com').exists())
+        self.assertTrue(User.objects.filter(school=self.school, email='new@example.com').exists())
 
     def test_requires_confirmation_before_skipping_duplicate_rows_in_file(self):
         records = [
@@ -164,10 +173,47 @@ class FirebaseUserImportViewTests(TestCase):
         confirmation = self.upload(records)
         self.assertEqual(confirmation.status_code, 409)
         self.assertEqual(confirmation.data['duplicate_count'], 1)
-        self.assertFalse(User.objects.filter(username='first@example.com').exists())
+        self.assertFalse(User.objects.filter(school=self.school, email='first@example.com').exists())
 
         completed = self.upload(records, skip_duplicates=True)
         self.assertEqual(completed.status_code, 201)
         self.assertEqual(completed.data['created_count'], 1)
         self.assertEqual(completed.data['skipped_count'], 1)
-        self.assertTrue(User.objects.filter(username='first@example.com').exists())
+        self.assertTrue(User.objects.filter(school=self.school, email='first@example.com').exists())
+
+    def test_allows_an_email_imported_for_a_different_school(self):
+        other_school = School.objects.create(name='Other School', slug='other-school')
+        User.objects.create_user(
+            username='shared@example.com', email='shared@example.com', password='test-password', school=other_school,
+        )
+        response = self.upload([{
+            'uid': 'shared-firebase-uid', 'email': 'shared@example.com',
+            'auth': {'disabled': False, 'emailVerified': True},
+            'firestore': {'usertype': 0, 'gender': 'Girl', 'name': 'Shared'},
+        }])
+        self.assertEqual(response.status_code, 201)
+        imported = User.objects.get(school=self.school, email='shared@example.com')
+        self.assertNotEqual(imported.username, 'shared@example.com')
+
+    def test_email_login_resolves_the_school_uuid_username(self):
+        email = 'member@example.com'
+        user = User.objects.create_user(
+            username=username_for_school_email(email, self.school),
+            email=email,
+            password='test-password',
+            school=self.school,
+            email_verified=True,
+            is_active=True,
+        )
+
+        self.school.name = 'Renamed School'
+        self.school.save(update_fields=['name'])
+        response = self.client.post(
+            '/api/auth/login/?school=test-school',
+            {'email': email, 'password': 'test-password'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['user']['id'], user.id)
+        self.assertEqual(user.username, username_for_school_email(email, self.school))

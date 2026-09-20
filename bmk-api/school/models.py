@@ -1,5 +1,8 @@
+import uuid
+
 from django.contrib.auth import get_user_model
-from django.db import models
+from django.db import models, transaction
+from django.db.models import Max
 
 from core.models import AuditModel
 from school.storage import (
@@ -55,6 +58,17 @@ class School(models.Model):
         SUNAADAM = 'sunaadam', 'Sunaadam'
 
     name = models.CharField(max_length=200)
+    user_identifier = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        help_text='Permanent identifier used internally in school user names.',
+    )
+    school_number = models.PositiveIntegerField(
+        unique=True,
+        editable=False,
+        help_text='Permanent short number used in school user-name suffixes.',
+    )
     # Host prefix under APP_DOMAIN — may include dots, e.g. uk.telugu → uk.telugu.localhost
     slug = models.CharField(
         max_length=100,
@@ -88,6 +102,16 @@ class School(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.school_number:
+            with transaction.atomic():
+                last_number = type(self).objects.select_for_update().aggregate(
+                    largest=Max('school_number')
+                )['largest'] or 0
+                self.school_number = last_number + 1
+                return super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
     @property
     def type_name(self) -> str:

@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useSchoolContent } from '../content/SchoolContentContext'
 import HeaderUser from './HeaderUser'
+import { scriptClassForLanguage } from '../types/content'
 import {
   dashboardPathForRole,
   schoolHomePath,
@@ -21,6 +22,8 @@ export default function SiteHeader() {
   const { user, loading } = useAuth()
   const { school, schoolSlug } = useSchoolContent()
   const schoolName = school.school_name || schoolSlug
+  const brandLanguage = school.secondary_language
+  const brandScriptClass = scriptClassForLanguage(brandLanguage)
   const mark = brandMark(schoolName)
   // Match ProtectedRoute: allow users with no school_slug yet, or matching school
   const onSchool =
@@ -37,15 +40,24 @@ export default function SiteHeader() {
             className="site-brand-logo"
             src={school.logo_url}
             alt={`${schoolName} logo`}
-            width={36}
-            height={36}
+            width={100}
+            height={100}
           />
         ) : (
           <span className="site-brand-mark" aria-hidden="true">
             {mark}
           </span>
         )}
-        <span className="site-brand-text">{schoolName}</span>
+        <span className="site-brand-copy">
+          <span className={`site-brand-main-text ${brandScriptClass}`} lang={brandLanguage || 'en'}>
+            {schoolName}
+          </span>
+          {school.tagline && (
+            <span className={`site-brand-sub-text ${brandScriptClass}`} lang={brandLanguage || 'en'}>
+              {school.tagline}
+            </span>
+          )}
+        </span>
       </NavLink>
 
       <nav className="site-nav" aria-label="Main">

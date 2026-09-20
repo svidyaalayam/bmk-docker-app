@@ -1,26 +1,26 @@
-import { useEffect, useState } from 'react'
-import SiteHeader from '../components/SiteHeader'
-import { useSchoolContent } from '../content/SchoolContentContext'
+import { useEffect, useState } from "react";
+import SiteHeader from "../components/SiteHeader";
+import { useSchoolContent } from "../content/SchoolContentContext";
 import {
   CLASS_SECTION_HEADERS,
   INTRODUCTION_HEADERS,
   SECONDARY_LANGUAGE_LABELS,
   scriptClassForLanguage,
-} from '../types/content'
-import type { Course, CourseClass, SecondaryLanguage } from '../types/content'
+} from "../types/content";
+import type { Course, CourseClass, SecondaryLanguage } from "../types/content";
 
 function splitParagraphs(text: string): string[] {
   return text
     .split(/\n\s*\n/)
     .map((part) => part.trim())
-    .filter(Boolean)
+    .filter(Boolean);
 }
 
 function splitLines(text: string): string[] {
   return text
     .split(/\n+/)
     .map((part) => part.trim())
-    .filter(Boolean)
+    .filter(Boolean);
 }
 
 function TextBlock({
@@ -28,15 +28,17 @@ function TextBlock({
   text,
   language,
 }: {
-  title: string
-  text: string
-  language?: SecondaryLanguage
+  title: string;
+  text: string;
+  language?: SecondaryLanguage;
 }) {
-  if (!text.trim()) return null
-  const paragraphs = text.includes('\n\n') ? splitParagraphs(text) : splitLines(text)
+  if (!text.trim()) return null;
+  const paragraphs = text.includes("\n\n")
+    ? splitParagraphs(text)
+    : splitLines(text);
   return (
     <div
-      className={`class-detail-block ${language ? scriptClassForLanguage(language) : ''}`}
+      className={`class-detail-block ${language ? scriptClassForLanguage(language) : ""}`}
       lang={language || undefined}
     >
       <h5>{title}</h5>
@@ -46,20 +48,20 @@ function TextBlock({
         ))}
       </ul>
     </div>
-  )
+  );
 }
 
 function useSecondaryDisplay(
   course: Course,
   schoolSecondaryLanguage: SecondaryLanguage,
 ): { useSecondary: boolean; language: SecondaryLanguage } {
-  const configuredSecondary = Boolean(schoolSecondaryLanguage)
+  const configuredSecondary = Boolean(schoolSecondaryLanguage);
   const useSecondary =
-    course.display_language === 'secondary' && configuredSecondary
+    course.display_language === "secondary" && configuredSecondary;
   return {
     useSecondary,
-    language: useSecondary ? schoolSecondaryLanguage : '',
-  }
+    language: useSecondary ? schoolSecondaryLanguage : "",
+  };
 }
 
 function ClassDetailPanel({
@@ -67,26 +69,27 @@ function ClassDetailPanel({
   useSecondary,
   secondaryLanguage,
 }: {
-  courseClass: CourseClass
-  useSecondary: boolean
-  secondaryLanguage: SecondaryLanguage
+  courseClass: CourseClass;
+  useSecondary: boolean;
+  secondaryLanguage: SecondaryLanguage;
 }) {
   const headers = useSecondary
-    ? CLASS_SECTION_HEADERS[secondaryLanguage || '']
-    : CLASS_SECTION_HEADERS.en
+    ? CLASS_SECTION_HEADERS[secondaryLanguage || ""]
+    : CLASS_SECTION_HEADERS.en;
 
   const curriculum = useSecondary
     ? courseClass.curriculum_secondary
-    : courseClass.curriculum
-  const aim = useSecondary ? courseClass.aim_secondary : courseClass.aim
+    : courseClass.curriculum;
+  const aim = useSecondary ? courseClass.aim_secondary : courseClass.aim;
   const conditions = useSecondary
     ? courseClass.conditions_secondary
-    : courseClass.conditions
+    : courseClass.conditions;
 
   const languageLabel = useSecondary
-    ? SECONDARY_LANGUAGE_LABELS[secondaryLanguage as Exclude<SecondaryLanguage, ''>] ||
-      'Secondary'
-    : 'English'
+    ? SECONDARY_LANGUAGE_LABELS[
+        secondaryLanguage as Exclude<SecondaryLanguage, "">
+      ] || "Secondary"
+    : "English";
 
   return (
     <div className="class-detail-panel" role="tabpanel">
@@ -114,25 +117,28 @@ function ClassDetailPanel({
       {!curriculum && !aim && !conditions && (
         <p className="muted-note">
           {useSecondary
-            ? 'Secondary-language aim, conditions, and curriculum can be configured in Django admin.'
-            : 'Aim, conditions, and curriculum can be configured in Django admin.'}
+            ? "Secondary-language aim, conditions, and curriculum can be configured in Django admin."
+            : "Aim, conditions, and curriculum can be configured in Django admin."}
         </p>
       )}
     </div>
-  )
+  );
 }
 
 function CourseBlock({
   course,
   schoolSecondaryLanguage,
 }: {
-  course: Course
-  schoolSecondaryLanguage: SecondaryLanguage
+  course: Course;
+  schoolSecondaryLanguage: SecondaryLanguage;
 }) {
   const [openClassId, setOpenClassId] = useState<number | null>(
     course.classes[0]?.id ?? null,
-  )
-  const { useSecondary, language } = useSecondaryDisplay(course, schoolSecondaryLanguage)
+  );
+  const { useSecondary, language } = useSecondaryDisplay(
+    course,
+    schoolSecondaryLanguage,
+  );
 
   return (
     <article className="course-block">
@@ -141,39 +147,45 @@ function CourseBlock({
           <h3>{course.title}</h3>
           <span className="class-lang-badge">
             {useSecondary
-              ? SECONDARY_LANGUAGE_LABELS[language as Exclude<SecondaryLanguage, ''>] ||
-                'Secondary'
-              : 'English'}
+              ? SECONDARY_LANGUAGE_LABELS[
+                  language as Exclude<SecondaryLanguage, "">
+                ] || "Secondary"
+              : "English"}
           </span>
         </div>
-        <p>{course.summary || 'No summary provided.'}</p>
-        {course.display_language === 'secondary' && !schoolSecondaryLanguage && (
-          <p className="muted-note">
-            This course is set to secondary language, but School settings has no secondary
-            language selected. Showing English for now.
-          </p>
-        )}
+        <p>{course.summary || "No summary provided."}</p>
+        {course.display_language === "secondary" &&
+          !schoolSecondaryLanguage && (
+            <p className="muted-note">
+              This course is set to secondary language, but School settings has
+              no secondary language selected. Showing English for now.
+            </p>
+          )}
       </div>
 
       {course.classes.length === 0 ? (
         <p className="muted-note">No classes published for this course yet.</p>
       ) : (
         <div className="class-layout">
-          <div className="class-tabs" role="tablist" aria-label={`${course.title} classes`}>
+          <div
+            className="class-tabs"
+            role="tablist"
+            aria-label={`${course.title} classes`}
+          >
             {course.classes.map((courseClass) => {
-              const selected = openClassId === courseClass.id
+              const selected = openClassId === courseClass.id;
               return (
                 <button
                   key={courseClass.id}
                   type="button"
                   role="tab"
                   aria-selected={selected}
-                  className={selected ? 'class-tab active' : 'class-tab'}
+                  className={selected ? "class-tab active" : "class-tab"}
                   onClick={() => setOpenClassId(courseClass.id)}
                 >
                   {courseClass.name}
                 </button>
-              )
+              );
             })}
           </div>
 
@@ -190,20 +202,20 @@ function CourseBlock({
         </div>
       )}
     </article>
-  )
+  );
 }
 
 export default function HomePage() {
-  const { loading, error, school, courses } = useSchoolContent()
-  const secondaryLanguage = school.secondary_language
+  const { loading, error, school, courses } = useSchoolContent();
+  const secondaryLanguage = school.secondary_language;
   const showSecondary =
-    Boolean(secondaryLanguage) && Boolean(school.introduction_secondary.trim())
+    Boolean(secondaryLanguage) && Boolean(school.introduction_secondary.trim());
 
   useEffect(() => {
     if (school.school_name) {
-      document.title = school.school_name
+      document.title = school.school_name;
     }
-  }, [school.school_name])
+  }, [school.school_name]);
 
   return (
     <div className="page-shell">
@@ -211,7 +223,7 @@ export default function HomePage() {
 
       <main>
         <section id="introduction" className="home-section first">
-          <div className="home-section-head">
+          {/* <div className="home-section-head">
             <div className="school-hero-brand">
               {school.logo_url && (
                 <img
@@ -227,9 +239,9 @@ export default function HomePage() {
                 <p>{school.tagline || 'About our school'}</p>
               </div>
             </div>
-          </div>
+          </div> */}
 
-          <div className={showSecondary ? 'intro-bilingual' : undefined}>
+          <div className={showSecondary ? "intro-bilingual" : undefined}>
             <article className="home-panel">
               <h3 className="intro-panel-title">{INTRODUCTION_HEADERS.en}</h3>
               {loading && <p>Loading school content…</p>}
@@ -237,8 +249,10 @@ export default function HomePage() {
               {!loading &&
                 splitParagraphs(
                   school.introduction ||
-                    'Introduction content will appear here once configured in Django admin.',
-                ).map((paragraph) => <p key={paragraph.slice(0, 32)}>{paragraph}</p>)}
+                    "Introduction content will appear here once configured in Django admin.",
+                ).map((paragraph) => (
+                  <p key={paragraph.slice(0, 32)}>{paragraph}</p>
+                ))}
             </article>
 
             {showSecondary && secondaryLanguage && (
@@ -249,9 +263,11 @@ export default function HomePage() {
                 <h3 className="intro-panel-title">
                   {INTRODUCTION_HEADERS[secondaryLanguage]}
                 </h3>
-                {splitParagraphs(school.introduction_secondary).map((paragraph) => (
-                  <p key={paragraph.slice(0, 32)}>{paragraph}</p>
-                ))}
+                {splitParagraphs(school.introduction_secondary).map(
+                  (paragraph) => (
+                    <p key={paragraph.slice(0, 32)}>{paragraph}</p>
+                  ),
+                )}
               </article>
             )}
           </div>
@@ -260,12 +276,18 @@ export default function HomePage() {
         <section id="courses" className="home-section">
           <div className="home-section-head">
             <h2>Courses & Classes</h2>
-            <p>Each course has its own classes with aim, conditions, and curriculum</p>
+            <p>
+              Each course has its own classes with aim, conditions, and
+              curriculum
+            </p>
           </div>
 
           {courses.length === 0 && !loading && (
             <article className="home-panel">
-              <p>No courses published yet. Add courses and classes in Django admin.</p>
+              <p>
+                No courses published yet. Add courses and classes in Django
+                admin.
+              </p>
             </article>
           )}
 
@@ -285,5 +307,5 @@ export default function HomePage() {
         <p>{school.footer_text || school.school_name}</p>
       </footer>
     </div>
-  )
+  );
 }

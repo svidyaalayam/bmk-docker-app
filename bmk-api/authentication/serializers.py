@@ -3,7 +3,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from school.models import Student, Teacher
+from school.models import School, Student, Teacher
 from school.tenancy import resolve_school
 
 from .emails import (
@@ -12,6 +12,7 @@ from .emails import (
     send_password_reset_email,
     user_from_uid,
 )
+from .usernames import username_for_school_email
 
 User = get_user_model()
 
@@ -42,6 +43,7 @@ class UserSerializer(serializers.ModelSerializer):
             'profile_locked',
             'legacy_uid',
             'date_joined',
+            'last_login',
             'avatar_url',
         )
         read_only_fields = fields
@@ -112,14 +114,36 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         raw_login = str(raw_login).strip()
         password = attrs.get('password') or ''
 
+        school_slug = ''
+        if request is not None:
+            query_params = getattr(request, 'query_params', None)
+            if query_params is not None:
+                school_slug = query_params.get('school') or ''
+            if not school_slug:
+                school_slug = request.headers.get('X-School-Slug') or request.META.get('HTTP_X_SCHOOL_SLUG') or ''
+            school_slug = school_slug.strip().lower()
+
+        school = None
+        users = User.objects.all()
+        if school_slug:
+            school = School.objects.filter(slug=school_slug, is_active=True).first()
+            users = users.filter(school=school) if school else User.objects.none()
         user = None
         if raw_login:
             if '@' in raw_login:
-                user = User.objects.filter(email__iexact=raw_login.lower()).first()
+                # Users enter their normal email. The selected school supplies the
+                # permanent UUID suffix used by the private Django username.
+                if school is not None:
+                    user = users.filter(
+                        username__iexact=username_for_school_email(raw_login, school)
+                    ).first()
+                # Supports older accounts until their usernames are migrated.
+                if user is None:
+                    user = users.filter(email__iexact=raw_login.lower()).first()
             if user is None:
-                user = User.objects.filter(username__iexact=raw_login).first()
+                user = users.filter(username__iexact=raw_login).first()
             if user is None and '@' not in raw_login:
-                user = User.objects.filter(email__iexact=raw_login.lower()).first()
+                user = users.filter(email__iexact=raw_login.lower()).first()
 
         if user is None or not user.check_password(password):
             raise serializers.ValidationError(
@@ -142,19 +166,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 },
                 code='authorization',
             )
-
-        school_slug = ''
-        if request is not None:
-            query_params = getattr(request, 'query_params', None)
-            if query_params is not None:
-                school_slug = query_params.get('school') or ''
-            if not school_slug:
-                school_slug = (
-                    request.headers.get('X-School-Slug')
-                    or request.META.get('HTTP_X_SCHOOL_SLUG')
-                    or ''
-                )
-            school_slug = school_slug.strip().lower()
 
         if school_slug:
             if not user.school_id or user.school.slug != school_slug:
@@ -207,9 +218,8 @@ class StudentRegistrationSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         email = value.strip().lower()
-        if User.objects.filter(email__iexact=email).exists() or User.objects.filter(
-            username__iexact=email
-        ).exists():
+        school = resolve_school(self.context['request'], required=True)
+        if User.objects.filter(school=school, email__iexact=email).exists():
             raise serializers.ValidationError('An account with this email already exists.')
         return email
 
@@ -222,7 +232,7 @@ class StudentRegistrationSerializer(serializers.Serializer):
         phone = validated_data['phone']
 
         user = User(
-            username=email,
+            username=username_for_school_email(email, school),
             email=email,
             first_name=validated_data['first_name'].strip(),
             last_name=validated_data['last_name'].strip(),
@@ -258,9 +268,8 @@ class TeacherRegistrationSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         email = value.strip().lower()
-        if User.objects.filter(email__iexact=email).exists() or User.objects.filter(
-            username__iexact=email
-        ).exists():
+        school = resolve_school(self.context['request'], required=True)
+        if User.objects.filter(school=school, email__iexact=email).exists():
             raise serializers.ValidationError('An account with this email already exists.')
         return email
 
@@ -273,7 +282,7 @@ class TeacherRegistrationSerializer(serializers.Serializer):
         phone = validated_data['phone']
 
         user = User(
-            username=email,
+            username=username_for_school_email(email, school),
             email=email,
             first_name=validated_data['first_name'].strip(),
             last_name=validated_data['last_name'].strip(),

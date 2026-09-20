@@ -14,6 +14,7 @@ import TeacherRequestsPage from './pages/TeacherRequestsPage'
 import MyClassesPage from './pages/MyClassesPage'
 import ClassDetailPage from './pages/ClassDetailPage'
 import SchoolPickerPage from './pages/SchoolPickerPage'
+import PlatformHomePage from './pages/PlatformHomePage'
 import StudentRegisterPage from './pages/StudentRegisterPage'
 import TeacherRegisterPage from './pages/TeacherRegisterPage'
 import ConfirmEmailPage from './pages/ConfirmEmailPage'
@@ -93,7 +94,8 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<SchoolPickerPage />} />
+      <Route path="/" element={<PlatformHomePage />} />
+      <Route path="/schools" element={<SchoolPickerPage />} />
       <Route path="/s/:schoolSlug/*" element={<LegacyPathRedirect />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

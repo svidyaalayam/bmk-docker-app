@@ -41,7 +41,8 @@ import { myClassesPath } from '../utils/routes'
 
 function personLabel(p: PersonBrief): string {
   const name = `${p.first_name || ''} ${p.last_name || ''}`.trim()
-  return name ? `${name} (${p.username})` : p.username
+  const email = p.email || 'No email available'
+  return name ? `${name} (${email})` : email
 }
 
 function formatSessionDate(isoDate: string): string {
@@ -116,7 +117,7 @@ export default function ClassDetailPage() {
     setDescription(data.description || '')
     setSelectedSessionId((prev) => {
       if (prev && data.sessions.some((s) => s.id === prev)) return prev
-      return data.sessions[0]?.id ?? null
+      return null
     })
   }, [id])
 

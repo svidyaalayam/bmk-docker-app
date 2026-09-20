@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from authentication.usernames import username_for_school_email
 from school.models import (
     Course,
     CourseClass,
@@ -25,8 +26,8 @@ class Command(BaseCommand):
         types = self._seed_taxonomy()
 
         bmk_settings = {
-            'school_name': 'UK Telugu',
-            'tagline': 'Telugu School — UK',
+            'school_name': 'బాల ముకుందము',
+            'tagline': 'తెలుగు పాఠశాల',
             'secondary_language': SchoolSettings.SecondaryLanguage.TELUGU,
             'introduction': (
                 'Being far away from our motherland, with the good intention of teaching our '
@@ -50,8 +51,8 @@ class Command(BaseCommand):
             domain='balavikas.localhost',
             subtype=types['kannada'],
             settings={
-                'school_name': 'Balavikas',
-                'tagline': 'Kannada School',
+                'school_name': 'ಬಾಲವಿಕಾಸ',
+                'tagline': 'ಕನ್ನಡ ಪಾಠಶಾಲ',
                 'secondary_language': SchoolSettings.SecondaryLanguage.KANNADA,
                 'introduction': (
                     'Balavikas is a Kannada learning programme for children living away from Karnataka. '
@@ -205,19 +206,19 @@ class Command(BaseCommand):
             (f'{prefix}_student', User.Roles.STUDENT, False, False),
         ]
         for username, role, is_staff, is_superuser in specs:
-            user, _ = User.objects.update_or_create(
-                username=username,
-                defaults={
-                    'email': f'{username}@{school.slug}.school',
-                    'role': role,
-                    'school': school,
-                    'is_staff': is_staff,
-                    'is_superuser': is_superuser,
-                    'is_active': True,
-                    'email_verified': True,
-                    'profile_locked': False,
-                },
-            )
+            email = f'{username}@{school.slug}.school'
+            # Match the school-local login identity, not the mutable internal
+            # username. order_by also tolerates old duplicate demo accounts.
+            user = User.objects.filter(school=school, email__iexact=email).order_by('id').first()
+            if user is None:
+                user = User(school=school, email=email)
+            user.username = username_for_school_email(email, school)
+            user.role = role
+            user.is_staff = is_staff
+            user.is_superuser = is_superuser
+            user.is_active = True
+            user.email_verified = True
+            user.profile_locked = False
             user.set_password(password)
             user.save()
 

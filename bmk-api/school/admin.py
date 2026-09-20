@@ -48,6 +48,7 @@ class SchoolAdmin(admin.ModelAdmin):
     list_display = (
         'name',
         'slug',
+        'school_number',
         'subtype',
         'lesson_app',
         'domain',
@@ -56,6 +57,7 @@ class SchoolAdmin(admin.ModelAdmin):
     )
     list_filter = ('lesson_app', 'is_active', 'subtype__school_type', 'subtype')
     search_fields = ('name', 'slug', 'domain')
+    readonly_fields = ('school_number', 'user_identifier')
     autocomplete_fields = ('subtype',)
     inlines = [SchoolSettingsInline]
 

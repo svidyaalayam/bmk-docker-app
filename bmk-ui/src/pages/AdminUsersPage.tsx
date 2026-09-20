@@ -54,7 +54,7 @@ function downloadSelectedUsers<T extends ExportableProfile>(kind: 'students' | '
         disabled: user.is_active === false,
         emailVerified: Boolean(user.email_verified),
         creationTime: user.date_joined || '',
-        lastSignInTime: null,
+        lastSignInTime: user.last_login || null,
       },
       firestore: {
         firestoreDocumentId: user.email || user.username,
@@ -87,6 +87,38 @@ function downloadSelectedUsers<T extends ExportableProfile>(kind: 'students' | '
   URL.revokeObjectURL(url)
 }
 
+function csvValue(value: unknown): string {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`
+}
+
+function downloadSelectedUsersCsv<T extends ExportableProfile>(kind: 'students' | 'teachers', profiles: T[]) {
+  const isStudent = kind === 'students'
+  const headers = [
+    'id', 'username', 'email', 'first_name', 'last_name', 'role', 'account_phone',
+    'gender', 'profile_phone', 'class_assignment_count', 'profile_active', 'account_active',
+    'email_verified', 'registration_date', 'last_login', 'legacy_uid',
+    ...(isStudent ? ['date_of_birth', 'parent_name', 'parent_phone', 'address', 'notes'] : []),
+  ]
+  const rows = profiles.map((profile) => {
+    const user = profile.user
+    const student = isStudent ? (profile as StudentProfile) : null
+    return [
+      user.id, user.username, user.email, user.first_name, user.last_name,
+      isStudent ? 'STUDENT' : 'TEACHER', user.phone_number, profile.gender, profile.phone,
+      profile.class_assignment_count, profile.is_active ? 'Yes' : 'No', user.is_active ? 'Yes' : 'No',
+      user.email_verified ? 'Yes' : 'No', user.date_joined, user.last_login, user.legacy_uid,
+      ...(student ? [student.date_of_birth, student.parent_name, student.parent_phone, student.address, student.notes] : []),
+    ]
+  })
+  const csv = [headers, ...rows].map((row) => row.map(csvValue).join(',')).join('\r\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${kind}-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 function UserExportControls({
   assignment,
   recent,
@@ -96,6 +128,7 @@ function UserExportControls({
   onSelectFiltered,
   onClearSelection,
   onExport,
+  onExportCsv,
 }: {
   assignment: AssignmentFilter
   recent: RecentFilter
@@ -105,6 +138,7 @@ function UserExportControls({
   onSelectFiltered: () => void
   onClearSelection: () => void
   onExport: () => void
+  onExportCsv: () => void
 }) {
   return (
     <div className="user-export-controls">
@@ -130,6 +164,9 @@ function UserExportControls({
         <button type="button" className="tab" onClick={onClearSelection} disabled={selectedCount === 0}>Deselect all</button>
         <button type="button" onClick={onExport} disabled={selectedCount === 0}>
           Export {selectedCount} selected to JSON
+        </button>
+        <button type="button" className="tab" onClick={onExportCsv} disabled={selectedCount === 0}>
+          Export {selectedCount} selected to CSV
         </button>
       </div>
     </div>
@@ -288,7 +325,6 @@ export default function AdminUsersPage() {
 
   const teacherColumns = useMemo<DataTableColumn<TeacherProfile>[]>(
     () => [
-      { key: 'username', header: 'Username', getValue: (t) => t.user.username },
       {
         key: 'name',
         header: 'Name',
@@ -338,7 +374,6 @@ export default function AdminUsersPage() {
 
   const studentColumns = useMemo<DataTableColumn<StudentProfile>[]>(
     () => [
-      { key: 'username', header: 'Username', getValue: (s) => s.user.username },
       {
         key: 'name',
         header: 'Name',
@@ -389,7 +424,6 @@ export default function AdminUsersPage() {
 
   const adminColumns = useMemo<DataTableColumn<User>[]>(
     () => [
-      { key: 'username', header: 'Username', getValue: (u) => u.username },
       {
         key: 'name',
         header: 'Name',
@@ -529,6 +563,7 @@ export default function AdminUsersPage() {
             onSelectFiltered={() => setSelectedTeacherIds(new Set(filteredTeachers.map((teacher) => teacher.id)))}
             onClearSelection={() => setSelectedTeacherIds(new Set())}
             onExport={() => downloadSelectedUsers('teachers', selectedTeachers)}
+            onExportCsv={() => downloadSelectedUsersCsv('teachers', selectedTeachers)}
           />
           <DataTable
             rows={filteredTeachers}
@@ -552,6 +587,7 @@ export default function AdminUsersPage() {
             onSelectFiltered={() => setSelectedStudentIds(new Set(filteredStudents.map((student) => student.id)))}
             onClearSelection={() => setSelectedStudentIds(new Set())}
             onExport={() => downloadSelectedUsers('students', selectedStudents)}
+            onExportCsv={() => downloadSelectedUsersCsv('students', selectedStudents)}
           />
           <DataTable
             rows={filteredStudents}

@@ -233,7 +233,7 @@ class AdminDashboardView(APIView):
         return Response(
             {
                 'dashboard': 'admin',
-                'message': f'Welcome Admin {request.user.username}',
+                'message': f'Welcome Admin {request.user.email}',
                 'pending_activations': pending,
                 'capabilities': [
                     'Review and activate registered students and teachers',
@@ -252,7 +252,7 @@ class TeacherDashboardView(APIView):
         return Response(
             {
                 'dashboard': 'teacher',
-                'message': f'Welcome Teacher {request.user.username}',
+                'message': f'Welcome Teacher {request.user.email}',
                 'capabilities': [
                     'View and update assigned classes',
                     'Manage class calendar, classwork, and homework notes',
@@ -270,7 +270,7 @@ class StudentDashboardView(APIView):
         return Response(
             {
                 'dashboard': 'student',
-                'message': f'Welcome Student {request.user.username}',
+                'message': f'Welcome Student {request.user.email}',
                 'capabilities': [
                     'View your classes and calendar',
                     'Add comments on your session records',

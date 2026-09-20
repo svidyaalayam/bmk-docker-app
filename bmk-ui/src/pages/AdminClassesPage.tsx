@@ -19,9 +19,10 @@ import type { StudentProfile, TeacherProfile } from '../types/school'
 import { getErrorMessage } from '../utils/errors'
 import { adminClassesPath, dashboardPathForRole } from '../utils/routes'
 
-function personLabel(p: { first_name: string; last_name: string; username: string }): string {
+function personLabel(p: { first_name: string; last_name: string; username: string; email?: string }): string {
   const name = `${p.first_name || ''} ${p.last_name || ''}`.trim()
-  return name ? `${name} (${p.username})` : p.username
+  const email = p.email || 'No email available'
+  return name ? `${name} (${email})` : email
 }
 
 export default function AdminClassesPage() {

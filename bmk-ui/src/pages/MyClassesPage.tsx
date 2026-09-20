@@ -8,9 +8,10 @@ import type { TeachingClassListItem } from '../types/classes'
 import { getErrorMessage } from '../utils/errors'
 import { classDetailPath, dashboardPathForRole } from '../utils/routes'
 
-function personLabel(p: { first_name: string; last_name: string; username: string }): string {
+function personLabel(p: { first_name: string; last_name: string; username: string; email?: string }): string {
   const name = `${p.first_name || ''} ${p.last_name || ''}`.trim()
-  return name ? `${name} (${p.username})` : p.username
+  const email = p.email || 'No email available'
+  return name ? `${name} (${email})` : email
 }
 
 export default function MyClassesPage() {

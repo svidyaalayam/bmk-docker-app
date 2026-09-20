@@ -18,6 +18,7 @@ export interface User {
   profile_locked?: boolean
   legacy_uid?: string | null
   date_joined?: string
+  last_login?: string | null
   avatar_url?: string | null
 }
 

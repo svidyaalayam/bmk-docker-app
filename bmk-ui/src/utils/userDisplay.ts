@@ -2,7 +2,7 @@ import type { User } from '../types/auth'
 
 export function getDisplayName(user: User): string {
   const fullName = `${user.first_name} ${user.last_name}`.trim()
-  return fullName || user.username
+  return fullName || user.email
 }
 
 export function getInitials(user: User): string {

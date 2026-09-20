@@ -1,17 +1,20 @@
 import json
+from datetime import timezone as datetime_timezone
+from email.utils import parsedate_to_datetime
 
 from django.contrib.auth import get_user_model
 from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
-from django.utils.dateparse import parse_date
+from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from authentication.permissions import IsAdminRole
 from authentication.serializers import UserSerializer
+from authentication.usernames import username_for_school_email
 from .models import AdminRequest, Course, CourseClass, School, SchoolSettings, SchoolSubtype, SchoolType, Student, StudentTeacherRequest, Teacher, TeachingClass
 from .serializers import (
     HomepageContentSerializer,
@@ -322,7 +325,7 @@ class FirebaseUserImportView(APIView):
 
         for data in prepared_users:
             number = data['_source_row']
-            existing = self._existing_user(data)
+            existing = self._existing_user(data, request.user.school)
             if existing:
                 reason = (
                     'Firebase ID already exists.'
@@ -354,14 +357,14 @@ class FirebaseUserImportView(APIView):
         with transaction.atomic():
             for data in prepared_users:
                 number = data.pop('_source_row')
-                existing = self._existing_user(data)
+                existing = self._existing_user(data, request.user.school)
                 if existing:
                     skipped.append({'row': number, 'email': data['email'], 'reason': 'User already exists.'})
                     continue
 
                 profile_data = data.pop('profile', None)
                 user = User(
-                    username=data['email'],
+                    username=username_for_school_email(data['email'], request.user.school),
                     email=data['email'],
                     first_name=data['first_name'],
                     last_name=data['last_name'],
@@ -376,6 +379,17 @@ class FirebaseUserImportView(APIView):
                 # password through the normal password-reset flow before their first login.
                 user.set_unusable_password()
                 user.save()
+                # auto_now_add always writes the current timestamp during the first save.
+                # Apply the legacy Firebase timestamps immediately afterwards instead.
+                update_fields = []
+                if data['creation_time'] is not None:
+                    user.date_joined = data['creation_time']
+                    update_fields.append('date_joined')
+                if data['last_sign_in_time'] is not None:
+                    user.last_login = data['last_sign_in_time']
+                    update_fields.append('last_login')
+                if update_fields:
+                    user.save(update_fields=update_fields)
 
                 if profile_data is not None:
                     profile_model = Teacher if data['role'] == User.Roles.TEACHER else Student
@@ -405,11 +419,12 @@ class FirebaseUserImportView(APIView):
         )
 
     @staticmethod
-    def _existing_user(data):
+    def _existing_user(data, school):
         return User.objects.filter(
             Q(username__iexact=data['email'])
             | Q(email__iexact=data['email'])
-            | Q(legacy_uid=data['legacy_uid'])
+            | Q(legacy_uid=data['legacy_uid']),
+            school=school,
         ).first()
 
     @staticmethod
@@ -444,6 +459,10 @@ class FirebaseUserImportView(APIView):
             else None
         )
         date_of_birth = FirebaseUserImportView._date_for(firestore.get('dob'))
+        creation_time = FirebaseUserImportView._timestamp_for(auth.get('creationTime'), 'auth.creationTime')
+        last_sign_in_time = FirebaseUserImportView._timestamp_for(
+            auth.get('lastSignInTime'), 'auth.lastSignInTime'
+        )
         disabled = bool(auth.get('disabled', False)) or bool(firestore.get('accountsuspended', False))
         is_active = not disabled
 
@@ -461,6 +480,8 @@ class FirebaseUserImportView(APIView):
             'role': role,
             'email_verified': bool(auth.get('emailVerified', False)),
             'is_active': is_active,
+            'creation_time': creation_time,
+            'last_sign_in_time': last_sign_in_time,
         }
         if role == User.Roles.TEACHER:
             base['profile'] = {'gender': gender, 'phone': base['phone_number'][:20]}
@@ -512,6 +533,23 @@ class FirebaseUserImportView(APIView):
         parsed = parse_date(str(value))
         if parsed is None:
             raise ValueError('firestore.dob must be blank or formatted as YYYY-MM-DD.')
+        return parsed
+
+    @staticmethod
+    def _timestamp_for(value, field_name):
+        if value in (None, ''):
+            return None
+        text = str(value).strip()
+        parsed = parse_datetime(text)
+        if parsed is None:
+            try:
+                parsed = parsedate_to_datetime(text)
+            except (TypeError, ValueError, IndexError):
+                parsed = None
+        if parsed is None:
+            raise ValueError(f'{field_name} must be a valid timestamp.')
+        if timezone.is_naive(parsed):
+            parsed = timezone.make_aware(parsed, datetime_timezone.utc)
         return parsed
 
 

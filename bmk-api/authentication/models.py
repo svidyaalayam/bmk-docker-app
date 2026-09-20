@@ -30,7 +30,6 @@ class User(AbstractUser):
         max_length=128,
         blank=True,
         null=True,
-        unique=True,
         help_text='Firebase UID retained when an account is imported from the legacy system.',
     )
     profile_locked = models.BooleanField(
