@@ -3,7 +3,7 @@ from datetime import timezone as datetime_timezone
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from .models import School, Student
@@ -20,6 +20,17 @@ class HostnameSlugTests(TestCase):
 
     def test_legacy_dotted_host_normalises_to_a_single_label_slug(self):
         self.assertEqual(_slug_from_host('uk.telugu.localhost:8080'), 'uk-telugu')
+
+    @override_settings(
+        APP_DOMAIN='balamukundam.com',
+        PLATFORM_HOSTNAME='test.balamukundam.com',
+        TENANT_HOST_SUFFIX='-test',
+    )
+    def test_test_suffix_host_returns_the_canonical_school_slug(self):
+        self.assertEqual(
+            _slug_from_host('uk-telugu-test.balamukundam.com'),
+            'uk-telugu',
+        )
 
 
 class FirebaseUserImportViewTests(TestCase):

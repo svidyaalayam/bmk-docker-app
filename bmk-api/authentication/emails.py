@@ -32,12 +32,12 @@ def frontend_origin_for_user(user, request=None) -> str:
         # Prefer explicit frontend base when set
     base = getattr(settings, 'FRONTEND_BASE_URL', '').rstrip('/')
     if base:
-        # If FRONTEND_BASE_URL is apex, prefix school slug when present
+        # The base is the platform hostname; tenant hosts use the configured
+        # suffix directly beneath APP_DOMAIN.
         if user.school_id and '://' in base:
-            # e.g. https://balamukundam.com → https://{slug}.balamukundam.com
-            # or https://test.balamukundam.com → https://{slug}.test.balamukundam.com
-            proto, rest = base.split('://', 1)
-            return f'{proto}://{user.school.slug}.{rest}'
+            proto, _ = base.split('://', 1)
+            label = f'{user.school.slug}{getattr(settings, "TENANT_HOST_SUFFIX", "")}'
+            return f'{proto}://{label}.{settings.APP_DOMAIN}'
         return base
 
     app_domain = getattr(settings, 'APP_DOMAIN', 'localhost')
@@ -46,7 +46,8 @@ def frontend_origin_for_user(user, request=None) -> str:
     if app_domain in {'localhost', '127.0.0.1'} and not port:
         port_suffix = ':8080'
     if user.school_id:
-        return f'{scheme}://{user.school.slug}.{app_domain}{port_suffix}'
+        label = f'{user.school.slug}{getattr(settings, "TENANT_HOST_SUFFIX", "")}'
+        return f'{scheme}://{label}.{app_domain}{port_suffix}'
     return f'{scheme}://{app_domain}{port_suffix}'
 
 

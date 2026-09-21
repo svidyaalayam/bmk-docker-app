@@ -36,13 +36,19 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = env_bool('DJANGO_DEBUG', True)
 
-# Shared with the UI (VITE_APP_DOMAIN). School sites are {slug}.{APP_DOMAIN}.
-# Set APP_DOMAIN per deployment environment; do not create environment-specific
-# settings modules solely to change the hostname.
+# Shared with the UI (VITE_APP_DOMAIN). School sites are
+# {slug}{TENANT_HOST_SUFFIX}.{APP_DOMAIN}.
 APP_DOMAIN = (
     os.environ.get('APP_DOMAIN')
     or os.environ.get('VITE_APP_DOMAIN')
     or 'localhost'
+).strip().lower()
+TENANT_HOST_SUFFIX = os.environ.get('TENANT_HOST_SUFFIX', '').strip().lower()
+# The platform picker can have its own first-level hostname in test/staging,
+# while production uses the domain apex.
+PLATFORM_HOSTNAME = (
+    os.environ.get('PLATFORM_HOSTNAME')
+    or APP_DOMAIN
 ).strip().lower()
 
 # Always allow local/docker service names; set DJANGO_ALLOWED_HOSTS per

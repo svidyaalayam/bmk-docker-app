@@ -6,7 +6,7 @@ from .models import School
 
 def _slug_from_host(host: str) -> str:
     """
-    uk-telugu.localhost / balavikas.x.x.x.x.nip.io → uk-telugu / balavikas.
+    uk-telugu-test.balamukundam.com / balavikas.localhost → uk-telugu / balavikas.
 
     Dotted legacy prefixes are normalised to a single DNS label, so
     uk.telugu.localhost also resolves as uk-telugu.
@@ -18,6 +18,10 @@ def _slug_from_host(host: str) -> str:
         return ''
 
     app_domain = getattr(settings, 'APP_DOMAIN', 'localhost').strip().lower()
+    platform_hostname = getattr(settings, 'PLATFORM_HOSTNAME', app_domain).strip().lower()
+    tenant_suffix = getattr(settings, 'TENANT_HOST_SUFFIX', '').strip().lower()
+    if hostname == platform_hostname:
+        return ''
     candidates = []
     if app_domain:
         candidates.append(app_domain)
@@ -31,7 +35,12 @@ def _slug_from_host(host: str) -> str:
         if hostname.endswith(suffix):
             sub = hostname[: -len(suffix)]
             if sub:
-                return sub.replace('.', '-')
+                slug = sub.replace('.', '-')
+                if tenant_suffix:
+                    if not slug.endswith(tenant_suffix):
+                        return ''
+                    slug = slug[: -len(tenant_suffix)]
+                return slug
     return ''
 
 

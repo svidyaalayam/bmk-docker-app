@@ -19,6 +19,11 @@ from school.models import (
 User = get_user_model()
 
 
+def school_hostname(slug: str) -> str:
+    suffix = django_settings.TENANT_HOST_SUFFIX
+    return f'{slug}{suffix}.{django_settings.APP_DOMAIN}'
+
+
 class Command(BaseCommand):
     help = 'Seed school types/subtypes and demo schools (language, music, academic).'
 
@@ -49,7 +54,7 @@ class Command(BaseCommand):
         bv = self._ensure_school(
             name='Balavikas',
             slug='balavikas',
-            domain=f'balavikas.{django_settings.APP_DOMAIN}',
+            domain=school_hostname('balavikas'),
             subtype=types['kannada'],
             settings={
                 'school_name': 'ಬಾಲವಿಕಾಸ',
@@ -68,21 +73,21 @@ class Command(BaseCommand):
         )
 
         regional = [
-            ('London Telugu', 'london.telugu', types['telugu'], 'te', 'London Telugu centre'),
-            ('UK East Telugu', 'ukeast.telugu', types['telugu'], 'te', 'UK East Telugu centre'),
-            ('UK North Telugu', 'uknorth.telugu', types['telugu'], 'te', 'UK North Telugu centre'),
-            ('UK Sanskrit', 'uk.sanskrit', types['sanskrit'], 'sa', 'UK Sanskrit centre'),
-            ('UK Kannada', 'uk.kannada', types['kannada'], 'kn', 'UK Kannada centre'),
-            ('Carnatic Vocal', 'uk.vocalcarnatic', types['carnatic'], '', 'Carnatic vocal classes'),
-            ('Carnatic Flute', 'uk.flutecarnatic', types['carnatic'], '', 'Carnatic flute classes'),
-            ('Tanjore Paintings School', 'uk.tanjorepaintings', types['painting'], '', 'Tanjore painting classes'),
-            ('UK 11+ Academic', 'uk11plus.academic', types['11plus'], '', 'UK 11+ exam preparation'),
+            ('London Telugu', 'london-telugu', types['telugu'], 'te', 'London Telugu centre'),
+            ('UK East Telugu', 'ukeast-telugu', types['telugu'], 'te', 'UK East Telugu centre'),
+            ('UK North Telugu', 'uknorth-telugu', types['telugu'], 'te', 'UK North Telugu centre'),
+            ('UK Sanskrit', 'uk-sanskrit', types['sanskrit'], 'sa', 'UK Sanskrit centre'),
+            ('UK Kannada', 'uk-kannada', types['kannada'], 'kn', 'UK Kannada centre'),
+            ('Carnatic Vocal', 'uk-vocalcarnatic', types['carnatic'], '', 'Carnatic vocal classes'),
+            ('Carnatic Flute', 'uk-flutecarnatic', types['carnatic'], '', 'Carnatic flute classes'),
+            ('Tanjore Paintings School', 'uk-tanjorepaintings', types['painting'], '', 'Tanjore painting classes'),
+            ('UK 11+ Academic', 'uk11plus-academic', types['11plus'], '', 'UK 11+ exam preparation'),
         ]
         for name, slug, subtype, lang, tagline in regional:
             self._ensure_school(
                 name=name,
                 slug=slug,
-                domain=f'{slug}.{django_settings.APP_DOMAIN}',
+                domain=school_hostname(slug),
                 subtype=subtype,
                 settings={
                     'school_name': name,
@@ -131,7 +136,7 @@ class Command(BaseCommand):
         if school:
             school.slug = 'uk-telugu'
             school.name = 'UK Telugu'
-            school.domain = f'uk-telugu.{django_settings.APP_DOMAIN}'
+            school.domain = school_hostname('uk-telugu')
             school.subtype = subtype
             school.is_active = True
             school.save()
@@ -143,7 +148,7 @@ class Command(BaseCommand):
         return self._ensure_school(
             name='UK Telugu',
             slug='uk-telugu',
-            domain=f'uk-telugu.{django_settings.APP_DOMAIN}',
+            domain=school_hostname('uk-telugu'),
             subtype=subtype,
             settings=settings,
         )

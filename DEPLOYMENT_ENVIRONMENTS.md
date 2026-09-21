@@ -15,9 +15,10 @@ CORS restrictions.
    `docker compose --env-file .env.test up --build -d`
 
 Use `.env.staging` or `.env.production` in the same way. `APP_DOMAIN` and
-`VITE_APP_DOMAIN` must remain identical because the API resolves school hosts
-and the frontend generates those hosts.
+`VITE_APP_DOMAIN` must remain identical, as must `TENANT_HOST_SUFFIX` and
+`VITE_TENANT_HOST_SUFFIX`, because the API resolves school hosts and the
+frontend generates those hosts.
 
 Each environment file permits its apex domain and all one-label school
 subdomains. For example, the test environment accepts
-`uk-telugu.test.balamukundam.com`.
+`uk-telugu-test.balamukundam.com`.

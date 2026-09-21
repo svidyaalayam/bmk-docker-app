@@ -1,0 +1,63 @@
+# Install on the VM as /etc/nginx/sites-available/bmk-environments.conf.
+# Each Compose environment publishes its UI only to loopback:
+# test -> 127.0.0.1:8080, staging -> 127.0.0.1:8081, production -> 127.0.0.1:8082.
+# Use the same Cloudflare Origin CA certificate in every HTTPS server block.
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name test.balamukundam.com staging.balamukundam.com balamukundam.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    # Exact platform hostname plus all tenant labels ending in -test.
+    server_name test.balamukundam.com ~^[a-z0-9-]+-test\.balamukundam\.com$;
+    ssl_certificate     /etc/ssl/cloudflare/balamukundam-origin.pem;
+    ssl_certificate_key /etc/ssl/cloudflare/balamukundam-origin.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    # Exact platform hostname plus all tenant labels ending in -staging.
+    server_name staging.balamukundam.com ~^[a-z0-9-]+-staging\.balamukundam\.com$;
+    ssl_certificate     /etc/ssl/cloudflare/balamukundam-origin.pem;
+    ssl_certificate_key /etc/ssl/cloudflare/balamukundam-origin.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+
+server {
+    listen 443 ssl http2 default_server;
+    listen [::]:443 ssl http2 default_server;
+    # This regex is deliberately last: Nginx uses the first matching regex,
+    # letting the two suffixed environments above take precedence.
+    server_name balamukundam.com ~^[a-z0-9-]+\.balamukundam\.com$;
+    ssl_certificate     /etc/ssl/cloudflare/balamukundam-origin.pem;
+    ssl_certificate_key /etc/ssl/cloudflare/balamukundam-origin.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    location / {
+        proxy_pass http://127.0.0.1:8082;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
