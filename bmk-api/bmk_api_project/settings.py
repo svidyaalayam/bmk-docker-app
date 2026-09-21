@@ -9,6 +9,8 @@ from datetime import timedelta
 from pathlib import Path
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -34,15 +36,17 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = env_bool('DJANGO_DEBUG', True)
 
-# Shared with the UI (VITE_APP_DOMAIN). School sites are {slug}.{APP_DOMAIN}
+# Shared with the UI (VITE_APP_DOMAIN). School sites are {slug}.{APP_DOMAIN}.
+# Set APP_DOMAIN per deployment environment; do not create environment-specific
+# settings modules solely to change the hostname.
 APP_DOMAIN = (
     os.environ.get('APP_DOMAIN')
     or os.environ.get('VITE_APP_DOMAIN')
     or 'localhost'
 ).strip().lower()
 
-# Always allow local/docker service names; extend via DJANGO_ALLOWED_HOSTS
-# (comma-separated). Use "*" only for quick VM demos — lock down in production.
+# Always allow local/docker service names; set DJANGO_ALLOWED_HOSTS per
+# deployment (comma-separated). Use "*" only for quick VM demos.
 _base_hosts = ['localhost', '127.0.0.1', '.localhost', 'api', 'web']
 _extra_hosts = env_list(
     'DJANGO_ALLOWED_HOSTS',
@@ -50,7 +54,7 @@ _extra_hosts = env_list(
 )
 ALLOWED_HOSTS = list(dict.fromkeys([*_base_hosts, *_extra_hosts]))
 
-_base_csrf = [
+_local_csrf_origins = [
     'http://localhost',
     'http://127.0.0.1',
     'http://localhost:80',
@@ -59,15 +63,21 @@ _base_csrf = [
     'http://127.0.0.1:8080',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    'http://uk.telugu.localhost',
+    'http://uk-telugu.localhost',
     'http://balavikas.localhost',
-    'http://uk.telugu.localhost:80',
+    'http://uk-telugu.localhost:80',
     'http://balavikas.localhost:80',
-    'http://uk.telugu.localhost:8080',
+    'http://uk-telugu.localhost:8080',
     'http://balavikas.localhost:8080',
 ]
-CSRF_TRUSTED_ORIGINS = list(
-    dict.fromkeys([*_base_csrf, *env_list('DJANGO_CSRF_TRUSTED_ORIGINS', [])])
+# CSRF_TRUSTED_ORIGINS is the deployment setting. Keep the old
+# DJANGO_CSRF_TRUSTED_ORIGINS name as a temporary compatibility fallback.
+# Local origins are supplied only for the local default domain; deployed
+# environments should list their own HTTPS origins in their env file.
+_csrf_default = _local_csrf_origins if APP_DOMAIN == 'localhost' else []
+CSRF_TRUSTED_ORIGINS = env_list(
+    'CSRF_TRUSTED_ORIGINS',
+    env_list('DJANGO_CSRF_TRUSTED_ORIGINS', _csrf_default),
 )
 
 INSTALLED_APPS = [
@@ -298,8 +308,9 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 
 # --- Email (confirmation + password reset) ---
-# Default: print emails to API logs (Docker-friendly for Test/Staging).
-# For real SMTP set EMAIL_HOST / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD in .env
+# Default: print emails to API logs (Docker-friendly for local development).
+# For a mail provider, configure the SMTP variables in the deployment environment.
+# Resend supports STARTTLS on port 587 and SMTPS on port 465.
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND',
     'django.core.mail.backends.console.EmailBackend',
@@ -309,6 +320,9 @@ EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
+EMAIL_USE_SSL = env_bool('EMAIL_USE_SSL', False)
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise ImproperlyConfigured('EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled.')
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL',
     'Balamukundam Vidyalayam <noreply@balamukundam.com>',

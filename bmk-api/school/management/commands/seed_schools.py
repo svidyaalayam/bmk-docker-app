@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.conf import settings as django_settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -48,7 +49,7 @@ class Command(BaseCommand):
         bv = self._ensure_school(
             name='Balavikas',
             slug='balavikas',
-            domain='balavikas.localhost',
+            domain=f'balavikas.{django_settings.APP_DOMAIN}',
             subtype=types['kannada'],
             settings={
                 'school_name': 'ಬಾಲವಿಕಾಸ',
@@ -81,7 +82,7 @@ class Command(BaseCommand):
             self._ensure_school(
                 name=name,
                 slug=slug,
-                domain=f'{slug}.localhost',
+                domain=f'{slug}.{django_settings.APP_DOMAIN}',
                 subtype=subtype,
                 settings={
                     'school_name': name,
@@ -99,13 +100,24 @@ class Command(BaseCommand):
         self._seed_users(bv, prefix='bv')
 
         self.stdout.write(self.style.SUCCESS(
-            'Seeded types/subtypes and schools (UK Telugu at uk.telugu, plus other centres).'
+            'Seeded types/subtypes and schools (UK Telugu at uk-telugu, plus other centres).'
         ))
 
     def _ensure_uk_telugu(self, subtype, settings):
-        """Map legacy balamukundam → uk.telugu (single Telugu UK centre)."""
+        """Map legacy balamukundam/uk.telugu → uk-telugu (single Telugu UK centre)."""
         legacy = School.objects.filter(slug='balamukundam').first()
-        existing = School.objects.filter(slug='uk.telugu').first()
+        existing = School.objects.filter(slug='uk-telugu').first()
+        dotted_legacy = School.objects.filter(slug='uk.telugu').first()
+
+        if dotted_legacy and existing and dotted_legacy.pk != existing.pk:
+            for model in (User, Course, Student, Teacher, TeachingClass):
+                model.objects.filter(school=dotted_legacy).update(school=existing)
+            SchoolSettings.objects.filter(school=dotted_legacy).delete()
+            dotted_legacy.delete()
+            dotted_legacy = None
+
+        if not existing:
+            existing = dotted_legacy
 
         if legacy and existing and legacy.pk != existing.pk:
             # Keep the legacy row (demo users/courses); drop the duplicate seed school.
@@ -117,9 +129,9 @@ class Command(BaseCommand):
 
         school = legacy or existing
         if school:
-            school.slug = 'uk.telugu'
+            school.slug = 'uk-telugu'
             school.name = 'UK Telugu'
-            school.domain = 'uk.telugu.localhost'
+            school.domain = f'uk-telugu.{django_settings.APP_DOMAIN}'
             school.subtype = subtype
             school.is_active = True
             school.save()
@@ -130,8 +142,8 @@ class Command(BaseCommand):
 
         return self._ensure_school(
             name='UK Telugu',
-            slug='uk.telugu',
-            domain='uk.telugu.localhost',
+            slug='uk-telugu',
+            domain=f'uk-telugu.{django_settings.APP_DOMAIN}',
             subtype=subtype,
             settings=settings,
         )

@@ -7,10 +7,19 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from .models import School, Student
+from .tenancy import _slug_from_host
 from authentication.usernames import username_for_school_email
 
 
 User = get_user_model()
+
+
+class HostnameSlugTests(TestCase):
+    def test_single_label_host_returns_its_slug(self):
+        self.assertEqual(_slug_from_host('uk-telugu.localhost:8080'), 'uk-telugu')
+
+    def test_legacy_dotted_host_normalises_to_a_single_label_slug(self):
+        self.assertEqual(_slug_from_host('uk.telugu.localhost:8080'), 'uk-telugu')
 
 
 class FirebaseUserImportViewTests(TestCase):

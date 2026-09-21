@@ -69,16 +69,16 @@ class School(models.Model):
         editable=False,
         help_text='Permanent short number used in school user-name suffixes.',
     )
-    # Host prefix under APP_DOMAIN — may include dots, e.g. uk.telugu → uk.telugu.localhost
+    # Single DNS label under APP_DOMAIN, e.g. uk-telugu → uk-telugu.localhost.
     slug = models.CharField(
         max_length=100,
         unique=True,
-        help_text='Host prefix under the app domain, e.g. uk.telugu or balamukundam',
+        help_text='Host prefix under the app domain, e.g. uk-telugu or balamukundam',
     )
     domain = models.CharField(
         max_length=255,
         blank=True,
-        help_text='Optional full hostname override, e.g. uk.telugu.balamukundam.com',
+        help_text='Optional full hostname override, e.g. uk-telugu.balamukundam.com',
     )
     subtype = models.ForeignKey(
         SchoolSubtype,

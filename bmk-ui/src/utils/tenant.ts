@@ -13,8 +13,9 @@ function currentProtocol(): string {
 /**
  * Resolve school host prefix from hostname.
  * Examples: balavikas.localhost → balavikas
- *           uk.telugu.localhost → uk.telugu
- *           uk.telugu.balamukundam.com → uk.telugu (when APP_DOMAIN=balamukundam.com)
+ *           uk-telugu.localhost → uk-telugu
+ *           uk-telugu.balamukundam.com → uk-telugu (when APP_DOMAIN=balamukundam.com)
+ * Legacy dotted prefixes are normalised, e.g. uk.telugu.localhost → uk-telugu.
  */
 export function getSchoolSlugFromHost(hostname = window.location.hostname): string | null {
   const host = hostname.toLowerCase().split(':')[0]
@@ -26,13 +27,13 @@ export function getSchoolSlugFromHost(hostname = window.location.hostname): stri
   const suffix = `.${APP_DOMAIN}`
   if (host.endsWith(suffix)) {
     const sub = host.slice(0, -suffix.length)
-    if (sub) return sub
+    if (sub) return sub.replaceAll('.', '-')
   }
 
   return null
 }
 
-/** Build origin for a school slug/host-prefix (may contain dots). */
+/** Build origin for a school slug/host-prefix. */
 export function schoolSiteOrigin(schoolSlug: string): string {
   return `${currentProtocol()}//${schoolSlug}.${APP_DOMAIN}${currentPortSuffix()}`
 }
