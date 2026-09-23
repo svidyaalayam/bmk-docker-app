@@ -48,6 +48,18 @@ export async function removeClassStudent(classId: number, studentId: number): Pr
   await api.delete(`/api/classes/${classId}/students/${studentId}/`)
 }
 
+export async function blockClassStudent(
+  classId: number,
+  studentId: number,
+  reason: string,
+): Promise<{ student_id: number; account_blocked: boolean; block_reason: string }> {
+  const { data } = await api.post(
+    `/api/classes/${classId}/students/${studentId}/block/`,
+    { reason },
+  )
+  return data
+}
+
 export async function listSessions(classId: number): Promise<ClassSession[]> {
   const { data } = await api.get<ClassSession[]>(`/api/classes/${classId}/sessions/`)
   return data

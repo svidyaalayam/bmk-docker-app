@@ -26,33 +26,21 @@ const fallbackSchool: SchoolSettings = {
 
 const SchoolContentContext = createContext<SchoolContentValue | undefined>(undefined)
 
-export function SchoolContentProvider({
-  schoolSlug,
-  children,
-}: {
-  schoolSlug: string
-  children: ReactNode
-}) {
+export function SchoolContentProvider({ children }: { children: ReactNode }) {
   const [content, setContent] = useState<HomepageContent | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const refresh = async () => {
-    if (!schoolSlug) return
-    const data = await fetchHomepageContent(schoolSlug)
+    const data = await fetchHomepageContent()
     setContent(data)
   }
 
   useEffect(() => {
-    if (!schoolSlug) {
-      setLoading(false)
-      setError('No school selected in the site address.')
-      return
-    }
     let cancelled = false
     setLoading(true)
     setError('')
-    fetchHomepageContent(schoolSlug)
+    fetchHomepageContent()
       .then((data) => {
         if (!cancelled) setContent(data)
       })
@@ -74,14 +62,15 @@ export function SchoolContentProvider({
     return () => {
       cancelled = true
     }
-  }, [schoolSlug])
+  }, [])
 
+  const schoolSlug = content?.school.school_slug ?? ''
   const value = useMemo<SchoolContentValue>(
     () => ({
       loading,
       error,
       schoolSlug,
-      school: content?.school ?? { ...fallbackSchool, school_slug: schoolSlug },
+      school: content?.school ?? fallbackSchool,
       courses: content?.courses ?? [],
       refresh,
     }),

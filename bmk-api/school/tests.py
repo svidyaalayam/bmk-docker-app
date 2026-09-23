@@ -6,42 +6,36 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from .models import School, Student
-from .tenancy import _slug_from_host
+from .models import SchoolSettings, Student
+from .tenancy import resolve_school
 from authentication.usernames import username_for_school_email
 
 
 User = get_user_model()
 
 
-class HostnameSlugTests(TestCase):
-    def test_single_label_host_returns_its_slug(self):
-        self.assertEqual(_slug_from_host('uk-telugu.localhost:8080'), 'uk-telugu')
-
-    def test_legacy_dotted_host_normalises_to_a_single_label_slug(self):
-        self.assertEqual(_slug_from_host('uk.telugu.localhost:8080'), 'uk-telugu')
-
-    @override_settings(
-        APP_DOMAIN='balamukundam.com',
-        PLATFORM_HOSTNAME='test.balamukundam.com',
-        TENANT_HOST_SUFFIX='-test',
-    )
-    def test_test_suffix_host_returns_the_canonical_school_slug(self):
-        self.assertEqual(
-            _slug_from_host('uk-telugu-test.balamukundam.com'),
-            'uk-telugu',
+class ResolveSchoolTests(TestCase):
+    def test_returns_singleton_school_settings(self):
+        settings = SchoolSettings.objects.create(
+            school_slug='uk-telugu',
+            school_number=1,
+            school_name='UK Telugu',
         )
+        self.assertEqual(resolve_school(required=True), settings)
 
 
 class FirebaseUserImportViewTests(TestCase):
     def setUp(self):
-        self.school = School.objects.create(name='Test School', slug='test-school')
+        self.school = SchoolSettings.objects.create(
+            school_name='Test School',
+            school_slug='test-school',
+            school_number=1,
+        )
         self.admin = User.objects.create_user(
             username='admin@example.com',
             email='admin@example.com',
             password='test-password',
             role=User.Roles.ADMIN,
-            school=self.school,
         )
         self.client = APIClient()
         self.client.force_authenticate(self.admin)
@@ -86,9 +80,9 @@ class FirebaseUserImportViewTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['created_count'], 1)
-        user = User.objects.get(school=self.school, email='ssmaruvada@gmail.com')
+        user = User.objects.get(email='ssmaruvada@gmail.com')
         self.assertEqual(user.username, username_for_school_email(user.email, self.school))
-        self.assertIn(f'--{self.school.school_number}@', user.username)
+        self.assertEqual(user.username, user.email)
         student = Student.objects.get(user=user)
         self.assertEqual(user.legacy_uid, '038046mLu2YVOa9eQjWwRK42k4d2')
         self.assertEqual(user.role, User.Roles.STUDENT)
@@ -120,7 +114,7 @@ class FirebaseUserImportViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(User.objects.filter(school=self.school).count(), 1)
+        self.assertEqual(User.objects.count(), 1)
         self.assertEqual(response.data['errors'][0]['row'], 2)
 
     def test_imports_admin_without_a_student_or_teacher_profile(self):
@@ -136,7 +130,7 @@ class FirebaseUserImportViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-        user = User.objects.get(school=self.school, email='legacy.admin@example.com')
+        user = User.objects.get(email='legacy.admin@example.com')
         self.assertEqual(user.role, User.Roles.ADMIN)
         self.assertFalse(hasattr(user, 'student_profile'))
         self.assertFalse(hasattr(user, 'teacher_profile'))
@@ -146,7 +140,6 @@ class FirebaseUserImportViewTests(TestCase):
             username='existing@example.com',
             email='existing@example.com',
             password='test-password',
-            school=self.school,
         )
         records = [
             {
@@ -166,13 +159,13 @@ class FirebaseUserImportViewTests(TestCase):
         confirmation = self.upload(records)
         self.assertEqual(confirmation.status_code, 409)
         self.assertEqual(confirmation.data['duplicate_count'], 1)
-        self.assertFalse(User.objects.filter(school=self.school, email='new@example.com').exists())
+        self.assertFalse(User.objects.filter(email='new@example.com').exists())
 
         completed = self.upload(records, skip_duplicates=True)
         self.assertEqual(completed.status_code, 201)
         self.assertEqual(completed.data['created_count'], 1)
         self.assertEqual(completed.data['skipped_count'], 1)
-        self.assertTrue(User.objects.filter(school=self.school, email='new@example.com').exists())
+        self.assertTrue(User.objects.filter(email='new@example.com').exists())
 
     def test_requires_confirmation_before_skipping_duplicate_rows_in_file(self):
         records = [
@@ -193,27 +186,25 @@ class FirebaseUserImportViewTests(TestCase):
         confirmation = self.upload(records)
         self.assertEqual(confirmation.status_code, 409)
         self.assertEqual(confirmation.data['duplicate_count'], 1)
-        self.assertFalse(User.objects.filter(school=self.school, email='first@example.com').exists())
+        self.assertFalse(User.objects.filter(email='first@example.com').exists())
 
         completed = self.upload(records, skip_duplicates=True)
         self.assertEqual(completed.status_code, 201)
         self.assertEqual(completed.data['created_count'], 1)
         self.assertEqual(completed.data['skipped_count'], 1)
-        self.assertTrue(User.objects.filter(school=self.school, email='first@example.com').exists())
+        self.assertTrue(User.objects.filter(email='first@example.com').exists())
 
-    def test_allows_an_email_imported_for_a_different_school(self):
-        other_school = School.objects.create(name='Other School', slug='other-school')
+    def test_rejects_an_email_that_already_exists(self):
         User.objects.create_user(
-            username='shared@example.com', email='shared@example.com', password='test-password', school=other_school,
+            username='shared@example.com', email='shared@example.com', password='test-password',
         )
         response = self.upload([{
             'uid': 'shared-firebase-uid', 'email': 'shared@example.com',
             'auth': {'disabled': False, 'emailVerified': True},
             'firestore': {'usertype': 0, 'gender': 'Girl', 'name': 'Shared'},
         }])
-        self.assertEqual(response.status_code, 201)
-        imported = User.objects.get(school=self.school, email='shared@example.com')
-        self.assertNotEqual(imported.username, 'shared@example.com')
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data['duplicate_count'], 1)
 
     def test_email_login_resolves_the_school_uuid_username(self):
         email = 'member@example.com'
@@ -221,15 +212,14 @@ class FirebaseUserImportViewTests(TestCase):
             username=username_for_school_email(email, self.school),
             email=email,
             password='test-password',
-            school=self.school,
             email_verified=True,
             is_active=True,
         )
 
-        self.school.name = 'Renamed School'
-        self.school.save(update_fields=['name'])
+        self.school.school_name = 'Renamed School'
+        self.school.save(update_fields=['school_name'])
         response = self.client.post(
-            '/api/auth/login/?school=test-school',
+            '/api/auth/login/',
             {'email': email, 'password': 'test-password'},
             format='json',
         )

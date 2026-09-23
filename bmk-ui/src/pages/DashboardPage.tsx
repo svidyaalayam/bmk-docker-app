@@ -49,7 +49,11 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <section className="dash-panel">
+        <section
+          className={`dash-panel dashboard-panel ${
+            user.role === "ADMIN" ? "admin-dashboard-panel" : ""
+          }`}
+        >
           <p className="welcome">
             Signed in as <strong>({user.email || "no email"})</strong>
           </p>
@@ -59,9 +63,9 @@ export default function DashboardPage() {
 
           {payload && (
             <>
-              <p>{payload.message}</p>
-              <h2>Capabilities</h2>
-              <ul>
+              <p className="dashboard-message">{payload.message}</p>
+              <h2 className="dashboard-section-title">Capabilities</h2>
+              <ul className="capabilities-list">
                 {payload.capabilities.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
@@ -93,7 +97,21 @@ export default function DashboardPage() {
             </section>
           )}
 
-          {(user.role === "TEACHER" || user.role === "STUDENT") && (
+          {user.role === "STUDENT" && payload?.account_blocked && (
+            <section className="account-blocked-notice">
+              <h2>Account blocked</h2>
+              <p>
+                {payload.block_reason ||
+                  "Your account is blocked. Please request activation from the Admin team."}
+              </p>
+              <Link to={adminCommunicationPath()} className="home-btn">
+                Request activation from Admin
+              </Link>
+            </section>
+          )}
+
+          {(user.role === "TEACHER" ||
+            (user.role === "STUDENT" && !payload?.account_blocked)) && (
             <div className="home-actions">
               <Link to={myClassesPath(user.role)} className="home-btn">
                 My Classes

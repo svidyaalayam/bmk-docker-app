@@ -33,4 +33,6 @@ export interface DashboardPayload {
   message: string
   capabilities: string[]
   pending_activations?: number
+  account_blocked?: boolean
+  block_reason?: string
 }

@@ -25,29 +25,31 @@ def user_from_uid(uidb64):
 
 
 def frontend_origin_for_user(user, request=None) -> str:
-    """Build school site origin for email links."""
+    """Build the school site origin for email links."""
+    if request is not None:
+        origin = (request.headers.get('Origin') or '').rstrip('/')
+        if origin:
+            return origin
+        referer = request.headers.get('Referer') or ''
+        if referer:
+            from urllib.parse import urlsplit
+
+            parts = urlsplit(referer)
+            if parts.scheme and parts.netloc:
+                return f'{parts.scheme}://{parts.netloc}'
+
+    base = getattr(settings, 'FRONTEND_BASE_URL', '').rstrip('/')
+    if base:
+        return base
+
     scheme = 'https'
     if request is not None:
         scheme = 'https' if request.is_secure() else request.scheme
-        # Prefer explicit frontend base when set
-    base = getattr(settings, 'FRONTEND_BASE_URL', '').rstrip('/')
-    if base:
-        # The base is the platform hostname; tenant hosts use the configured
-        # suffix directly beneath APP_DOMAIN.
-        if user.school_id and '://' in base:
-            proto, _ = base.split('://', 1)
-            label = f'{user.school.slug}{getattr(settings, "TENANT_HOST_SUFFIX", "")}'
-            return f'{proto}://{label}.{settings.APP_DOMAIN}'
-        return base
-
     app_domain = getattr(settings, 'APP_DOMAIN', 'localhost')
     port = getattr(settings, 'FRONTEND_PORT', '')
     port_suffix = f':{port}' if port else ''
     if app_domain in {'localhost', '127.0.0.1'} and not port:
         port_suffix = ':8080'
-    if user.school_id:
-        label = f'{user.school.slug}{getattr(settings, "TENANT_HOST_SUFFIX", "")}'
-        return f'{scheme}://{label}.{app_domain}{port_suffix}'
     return f'{scheme}://{app_domain}{port_suffix}'
 
 

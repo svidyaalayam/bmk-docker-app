@@ -7,9 +7,8 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    // Allow school subdomains like balavikas.localhost
     allowedHosts: ['.localhost', 'localhost'],
-    // Same-origin /api on school subdomains → avoids CORS with Django
+    // Same-origin /api in dev avoids CORS with Django
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',

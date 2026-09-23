@@ -15,11 +15,9 @@ from rest_framework.views import APIView
 from authentication.permissions import IsAdminRole
 from authentication.serializers import UserSerializer
 from authentication.usernames import username_for_school_email
-from .models import AdminRequest, Course, CourseClass, School, SchoolSettings, SchoolSubtype, SchoolType, Student, StudentTeacherRequest, Teacher, TeachingClass
+from .models import AdminRequest, Course, CourseClass, Student, StudentTeacherRequest, Teacher, TeachingClass
 from .serializers import (
     HomepageContentSerializer,
-    SchoolCatalogSerializer,
-    SchoolSerializer,
     SchoolSettingsSerializer,
     StudentSerializer,
     StudentUpdateSerializer,
@@ -33,38 +31,6 @@ from .tenancy import resolve_school
 User = get_user_model()
 
 
-class SchoolListView(APIView):
-    authentication_classes = []
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request):
-        """Flat list (legacy) plus hierarchical catalog for the platform picker."""
-        schools = School.objects.filter(is_active=True).select_related(
-            'settings',
-            'subtype__school_type',
-        )
-        types = (
-            SchoolType.objects.filter(is_active=True)
-            .prefetch_related(
-                Prefetch(
-                    'subtypes',
-                    queryset=SchoolSubtype.objects.filter(is_active=True).prefetch_related(
-                        Prefetch(
-                            'schools',
-                            queryset=School.objects.filter(is_active=True).select_related('settings'),
-                        )
-                    ),
-                )
-            )
-        )
-        return Response(
-            {
-                'schools': SchoolSerializer(schools, many=True).data,
-                'catalog': SchoolCatalogSerializer(types, many=True).data,
-            }
-        )
-
-
 class HomepageContentView(APIView):
     """Public homepage payload for one school."""
 
@@ -72,12 +38,8 @@ class HomepageContentView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        school = resolve_school(request, required=True)
-        settings = getattr(school, 'settings', None)
-        if settings is None:
-            return Response({'detail': 'School settings are not configured.'}, status=404)
-
-        courses = school.courses.filter(is_published=True, is_active=True).prefetch_related(
+        settings = resolve_school(request, required=True)
+        courses = Course.objects.filter(is_published=True, is_active=True).prefetch_related(
             Prefetch(
                 'classes',
                 queryset=CourseClass.objects.filter(is_published=True, is_active=True),
@@ -95,10 +57,7 @@ class SchoolSettingsPublicView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        school = resolve_school(request, required=True)
-        settings = getattr(school, 'settings', None)
-        if settings is None:
-            return Response({'detail': 'School settings are not configured.'}, status=404)
+        settings = resolve_school(request, required=True)
         return Response(SchoolSettingsSerializer(settings).data)
 
 
@@ -107,7 +66,7 @@ class UserListView(generics.ListAPIView):
     permission_classes = [IsAdminRole]
 
     def get_queryset(self):
-        queryset = User.objects.filter(school=self.request.user.school).order_by('role', 'username')
+        queryset = User.objects.all().order_by('role', 'username')
         role = self.request.query_params.get('role')
         if role:
             queryset = queryset.filter(role=role.upper())
@@ -133,7 +92,6 @@ class UserAdminRequestView(APIView):
         if request.user.role == User.Roles.ADMIN:
             return Response({'detail': 'Admin accounts do not have user requests.'}, status=400)
         items = AdminRequest.objects.filter(
-            school=request.user.school,
             user=request.user,
         ).select_related('user', 'replied_by')[:10]
         return Response(AdminRequestSerializer(items, many=True).data)
@@ -141,8 +99,6 @@ class UserAdminRequestView(APIView):
     def post(self, request):
         if request.user.role == User.Roles.ADMIN:
             return Response({'detail': 'Admin accounts cannot submit user requests.'}, status=400)
-        if not request.user.school_id:
-            return Response({'detail': 'Your account is not linked to a school.'}, status=400)
         kind = request.data.get('kind')
         subject = str(request.data.get('subject') or '').strip()
         message = str(request.data.get('message') or '').strip()
@@ -150,7 +106,7 @@ class UserAdminRequestView(APIView):
             return Response({'kind': 'Choose Request or Feedback / suggestion.'}, status=400)
         if not subject or not message:
             return Response({'detail': 'A subject and message are required.'}, status=400)
-        item = AdminRequest.objects.create(school=request.user.school, user=request.user, kind=kind, subject=subject, message=message)
+        item = AdminRequest.objects.create(user=request.user, kind=kind, subject=subject, message=message)
         return Response(AdminRequestSerializer(item).data, status=status.HTTP_201_CREATED)
 
 
@@ -158,7 +114,7 @@ class AdminRequestListView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
-        queryset = AdminRequest.objects.filter(school=request.user.school).select_related('user', 'replied_by')
+        queryset = AdminRequest.objects.all().select_related('user', 'replied_by')
         if request.query_params.get('status') == 'open':
             queryset = queryset.filter(resolved=False)
         elif request.query_params.get('status') == 'resolved':
@@ -181,7 +137,7 @@ class AdminRequestDetailView(APIView):
 
     def patch(self, request, pk):
         try:
-            item = AdminRequest.objects.select_related('user', 'replied_by').get(pk=pk, school=request.user.school)
+            item = AdminRequest.objects.select_related('user', 'replied_by').get(pk=pk)
         except AdminRequest.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
         if 'reply' in request.data:
@@ -214,7 +170,7 @@ class StudentTeacherRequestView(APIView):
             return Response({'detail': 'Student profile required.'}, status=400)
         try:
             teaching_class = TeachingClass.objects.get(
-                pk=request.data.get('class_id'), school=request.user.school, memberships__student=student, is_active=True,
+                pk=request.data.get('class_id'), memberships__student=student, is_active=True,
             )
         except (TeachingClass.DoesNotExist, TypeError, ValueError):
             return Response({'class_id': 'Choose one of your active classes.'}, status=400)
@@ -223,7 +179,7 @@ class StudentTeacherRequestView(APIView):
             return Response({'kind': 'Choose Request or Feedback / suggestion.'}, status=400)
         if not subject or not message:
             return Response({'detail': 'A subject and message are required.'}, status=400)
-        item = StudentTeacherRequest.objects.create(school=request.user.school, teaching_class=teaching_class, student=student, kind=kind, subject=subject, message=message)
+        item = StudentTeacherRequest.objects.create(teaching_class=teaching_class, student=student, kind=kind, subject=subject, message=message)
         return Response(StudentTeacherRequestSerializer(item).data, status=status.HTTP_201_CREATED)
 
 
@@ -236,7 +192,7 @@ class TeacherRequestListView(APIView):
         teacher = getattr(request.user, 'teacher_profile', None)
         if not teacher:
             return Response({'detail': 'Teacher profile required.'}, status=400)
-        queryset = StudentTeacherRequest.objects.filter(school=request.user.school).filter(Q(teaching_class__teacher_1=teacher) | Q(teaching_class__teacher_2=teacher)).select_related('student__user', 'teaching_class', 'replied_by')
+        queryset = StudentTeacherRequest.objects.filter(Q(teaching_class__teacher_1=teacher) | Q(teaching_class__teacher_2=teacher)).select_related('student__user', 'teaching_class', 'replied_by')
         if request.query_params.get('status') == 'open': queryset = queryset.filter(resolved=False)
         elif request.query_params.get('status') == 'resolved': queryset = queryset.filter(resolved=True)
         try: page = max(1, int(request.query_params.get('page', 1)))
@@ -251,7 +207,7 @@ class TeacherRequestDetailView(APIView):
     def patch(self, request, pk):
         if request.user.role != User.Roles.TEACHER: return Response({'detail': 'Teacher access required.'}, status=403)
         teacher = getattr(request.user, 'teacher_profile', None)
-        try: item = StudentTeacherRequest.objects.select_related('student__user', 'teaching_class', 'replied_by').get(pk=pk, school=request.user.school)
+        try: item = StudentTeacherRequest.objects.select_related('student__user', 'teaching_class', 'replied_by').get(pk=pk)
         except StudentTeacherRequest.DoesNotExist: return Response({'detail': 'Not found.'}, status=404)
         if not teacher or (item.teaching_class.teacher_1_id != teacher.id and item.teaching_class.teacher_2_id != teacher.id): return Response({'detail': 'Not allowed.'}, status=403)
         if 'reply' in request.data: item.reply = str(request.data['reply']).strip(); item.replied_by = request.user
@@ -286,9 +242,6 @@ class FirebaseUserImportView(APIView):
             return Response({'detail': 'The JSON file does not contain any users.'}, status=400)
         if len(records) > self.max_users:
             return Response({'detail': f'A maximum of {self.max_users} users can be imported at once.'}, status=400)
-        if not request.user.school_id:
-            return Response({'detail': 'Your admin account is not linked to a school.'}, status=400)
-
         prepared_users = []
         errors = []
         duplicate_rows = []
@@ -325,7 +278,7 @@ class FirebaseUserImportView(APIView):
 
         for data in prepared_users:
             number = data['_source_row']
-            existing = self._existing_user(data, request.user.school)
+            existing = self._existing_user(data)
             if existing:
                 reason = (
                     'Firebase ID already exists.'
@@ -357,20 +310,18 @@ class FirebaseUserImportView(APIView):
         with transaction.atomic():
             for data in prepared_users:
                 number = data.pop('_source_row')
-                existing = self._existing_user(data, request.user.school)
+                existing = self._existing_user(data)
                 if existing:
-                    skipped.append({'row': number, 'email': data['email'], 'reason': 'User already exists.'})
                     continue
 
                 profile_data = data.pop('profile', None)
                 user = User(
-                    username=username_for_school_email(data['email'], request.user.school),
+                    username=username_for_school_email(data['email'], resolve_school(request, required=True)),
                     email=data['email'],
                     first_name=data['first_name'],
                     last_name=data['last_name'],
                     phone_number=data['phone_number'] or None,
                     role=data['role'],
-                    school=request.user.school,
                     email_verified=data['email_verified'],
                     is_active=data['is_active'],
                     legacy_uid=data['legacy_uid'],
@@ -394,7 +345,6 @@ class FirebaseUserImportView(APIView):
                 if profile_data is not None:
                     profile_model = Teacher if data['role'] == User.Roles.TEACHER else Student
                     profile_model.objects.create(
-                        school=request.user.school,
                         user=user,
                         is_active=data['is_active'],
                         created_by=request.user,
@@ -419,12 +369,11 @@ class FirebaseUserImportView(APIView):
         )
 
     @staticmethod
-    def _existing_user(data, school):
+    def _existing_user(data):
         return User.objects.filter(
             Q(username__iexact=data['email'])
             | Q(email__iexact=data['email'])
             | Q(legacy_uid=data['legacy_uid']),
-            school=school,
         ).first()
 
     @staticmethod
@@ -559,7 +508,7 @@ class TeacherListView(generics.ListAPIView):
 
     def get_queryset(self):
         return (
-            Teacher.objects.filter(school=self.request.user.school)
+            Teacher.objects.all()
             .select_related('user')
             .annotate(
                 class_assignment_count=Count(
@@ -577,7 +526,7 @@ class TeacherDetailView(generics.RetrieveUpdateAPIView):
     http_method_names = ['get', 'put', 'patch', 'head', 'options']
 
     def get_queryset(self):
-        return Teacher.objects.filter(school=self.request.user.school).select_related('user')
+        return Teacher.objects.all().select_related('user')
 
     def get_serializer_class(self):
         if self.request.method in ('PUT', 'PATCH'):
@@ -599,7 +548,7 @@ class StudentListView(generics.ListAPIView):
 
     def get_queryset(self):
         return (
-            Student.objects.filter(school=self.request.user.school)
+            Student.objects.all()
             .select_related('user')
             .annotate(
                 class_assignment_count=Count(
@@ -614,7 +563,7 @@ class StudentDetailView(generics.RetrieveUpdateAPIView):
     http_method_names = ['get', 'put', 'patch', 'head', 'options']
 
     def get_queryset(self):
-        return Student.objects.filter(school=self.request.user.school).select_related('user')
+        return Student.objects.all().select_related('user')
 
     def get_serializer_class(self):
         if self.request.method in ('PUT', 'PATCH'):

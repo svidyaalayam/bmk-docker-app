@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import (
@@ -9,6 +10,7 @@ from .models import (
     ClassSessionHomework,
     ClassSessionMaterial,
     Student,
+    SchoolSettings,
     Teacher,
     TeachingClass,
 )
@@ -22,10 +24,23 @@ class StudentBriefSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source='user.first_name', read_only=True)
     last_name = serializers.CharField(source='user.last_name', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
+    avatar_url = serializers.SerializerMethodField()
+    account_blocked = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Student
-        fields = ('id', 'username', 'first_name', 'last_name', 'email')
+        fields = (
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'avatar_url',
+            'account_blocked',
+        )
+
+    def get_avatar_url(self, obj):
+        return obj.user.avatar.url if obj.user.avatar else None
 
 
 class TeacherBriefSerializer(serializers.ModelSerializer):
@@ -177,7 +192,7 @@ class TeachingClassDetailSerializer(serializers.ModelSerializer):
         allow_null=True,
         required=False,
     )
-    students = StudentBriefSerializer(many=True, read_only=True)
+    students = serializers.SerializerMethodField()
     sessions = ClassSessionSerializer(many=True, read_only=True)
     student_ids = serializers.ListField(
         child=serializers.IntegerField(),
@@ -205,34 +220,80 @@ class TeachingClassDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'is_active', 'created_at', 'updated_at')
 
     def validate(self, attrs):
-        school = self.context['school']
         teacher_1 = attrs.get('teacher_1') or getattr(self.instance, 'teacher_1', None)
         teacher_2 = attrs.get('teacher_2', serializers.empty)
         if teacher_2 is serializers.empty:
             teacher_2 = getattr(self.instance, 'teacher_2', None) if self.instance else None
 
-        if teacher_1 and teacher_1.school_id != school.id:
-            raise serializers.ValidationError({'teacher_1_id': 'Teacher must belong to this school.'})
-        if teacher_2 and teacher_2.school_id != school.id:
-            raise serializers.ValidationError({'teacher_2_id': 'Teacher must belong to this school.'})
         if teacher_1 and teacher_2 and teacher_1.pk == teacher_2.pk:
             raise serializers.ValidationError({'teacher_2_id': 'Teacher 2 must differ from teacher 1.'})
 
         name = attrs.get('name')
         if name:
-            qs = TeachingClass.objects.filter(school=school, name=name)
+            qs = TeachingClass.objects.filter(name=name)
             if self.instance:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError({'name': 'A class with this name already exists.'})
         return attrs
 
+    def get_students(self, obj):
+        today = timezone.localdate()
+        school_settings = SchoolSettings.objects.order_by('id').first()
+        block_threshold = (
+            school_settings.unauthorised_absence_block_threshold
+            if school_settings
+            else 3
+        )
+        started_sessions = [
+            session
+            for session in obj.sessions.all()
+            if session.is_started and session.session_date <= today
+        ]
+        present_by_student = {}
+        attendance_by_session_student = {}
+        for session in started_sessions:
+            for record in session.attendance_records.all():
+                attendance_by_session_student[(session.pk, record.student_id)] = record.status
+                if record.status == ClassSessionAttendance.Status.PRESENT:
+                    present_by_student[record.student_id] = present_by_student.get(record.student_id, 0) + 1
+
+        students = []
+        for student in obj.students.all():
+            data = StudentBriefSerializer(student).data
+            data['attendance_present'] = present_by_student.get(student.pk, 0)
+            student_sessions = [
+                session
+                for session in started_sessions
+                if (session.pk, student.pk) in attendance_by_session_student
+            ]
+            data['attendance_total'] = len(student_sessions)
+            recent_sessions = started_sessions[-block_threshold:]
+            data['attendance_recent'] = [
+                {
+                    'date': session.session_date.isoformat(),
+                    'status': attendance_by_session_student.get((session.pk, student.pk)),
+                }
+                for session in recent_sessions
+            ]
+            recent_statuses = [
+                attendance_by_session_student[(session.pk, student.pk)]
+                for session in student_sessions[-block_threshold:]
+            ]
+            data['can_block'] = (
+                len(recent_statuses) == block_threshold
+                and all(
+                    status == ClassSessionAttendance.Status.UNAUTHORISED_ABSENT
+                    for status in recent_statuses
+                )
+            )
+            students.append(data)
+        return students
+
     def create(self, validated_data):
         student_ids = validated_data.pop('student_ids', [])
-        school = self.context['school']
         user = self.context['request'].user
         teaching_class = TeachingClass.objects.create(
-            school=school,
             created_by=user,
             updated_by=user,
             **validated_data,
@@ -252,9 +313,8 @@ class TeachingClassDetailSerializer(serializers.ModelSerializer):
         return instance
 
     def _sync_students(self, teaching_class, student_ids, user):
-        school = teaching_class.school
         wanted = set(
-            Student.objects.filter(school=school, pk__in=student_ids).values_list('id', flat=True)
+            Student.objects.filter(pk__in=student_ids).values_list('id', flat=True)
         )
         existing = set(teaching_class.memberships.values_list('student_id', flat=True))
         for sid in wanted - existing:

@@ -47,7 +47,6 @@ export default function StudentRegisterPage() {
           date_of_birth: toApiDate(dob),
           phone: phone.trim(),
         },
-        schoolSlug,
       )
       setMessage(data.detail)
     } catch (err) {

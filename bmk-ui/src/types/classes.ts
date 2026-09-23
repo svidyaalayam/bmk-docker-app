@@ -10,6 +10,12 @@ export interface PersonBrief {
   first_name: string
   last_name: string
   email?: string
+  avatar_url?: string | null
+  account_blocked?: boolean
+  attendance_present?: number
+  attendance_total?: number
+  attendance_recent?: Array<{ date: string; status: AttendanceStatus | null }>
+  can_block?: boolean
 }
 
 export interface ClassSession {

@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { useAuth } from './auth/AuthContext'
 import { SchoolContentProvider } from './content/SchoolContentContext'
@@ -13,8 +12,6 @@ import CommunicationsPage from './pages/CommunicationsPage'
 import TeacherRequestsPage from './pages/TeacherRequestsPage'
 import MyClassesPage from './pages/MyClassesPage'
 import ClassDetailPage from './pages/ClassDetailPage'
-import SchoolPickerPage from './pages/SchoolPickerPage'
-import PlatformHomePage from './pages/PlatformHomePage'
 import StudentRegisterPage from './pages/StudentRegisterPage'
 import TeacherRegisterPage from './pages/TeacherRegisterPage'
 import ConfirmEmailPage from './pages/ConfirmEmailPage'
@@ -22,7 +19,6 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import ProfilePage from './pages/ProfilePage'
 import { dashboardPathForRole, schoolHomePath, schoolLoginPath } from './utils/routes'
-import { getSchoolSlugFromHost, schoolSiteUrl } from './utils/tenant'
 import './App.css'
 
 function DashboardRedirect() {
@@ -32,9 +28,9 @@ function DashboardRedirect() {
   return <Navigate to={dashboardPathForRole(user.role)} replace />
 }
 
-function SchoolRoutes({ schoolSlug }: { schoolSlug: string }) {
+export default function App() {
   return (
-    <SchoolContentProvider schoolSlug={schoolSlug}>
+    <SchoolContentProvider>
       <Routes>
         <Route index element={<HomePage />} />
         <Route path="login" element={<LoginPage />} />
@@ -72,32 +68,5 @@ function SchoolRoutes({ schoolSlug }: { schoolSlug: string }) {
         <Route path="*" element={<Navigate to={schoolHomePath()} replace />} />
       </Routes>
     </SchoolContentProvider>
-  )
-}
-
-function LegacyPathRedirect() {
-  const { schoolSlug = '' } = useParams()
-  useEffect(() => {
-    if (schoolSlug) {
-      window.location.replace(schoolSiteUrl(schoolSlug, '/'))
-    }
-  }, [schoolSlug])
-  return <div className="page-center">Opening {schoolSlug}…</div>
-}
-
-export default function App() {
-  const schoolSlug = getSchoolSlugFromHost()
-
-  if (schoolSlug) {
-    return <SchoolRoutes schoolSlug={schoolSlug} />
-  }
-
-  return (
-    <Routes>
-      <Route path="/" element={<PlatformHomePage />} />
-      <Route path="/schools" element={<SchoolPickerPage />} />
-      <Route path="/s/:schoolSlug/*" element={<LegacyPathRedirect />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
   )
 }

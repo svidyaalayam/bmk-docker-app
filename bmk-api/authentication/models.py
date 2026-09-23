@@ -14,14 +14,6 @@ class User(AbstractUser):
         default=Roles.STUDENT,
     )
     phone_number = models.CharField(max_length=15, blank=True, null=True)
-    school = models.ForeignKey(
-        'school.School',
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-        related_name='users',
-        help_text='School this user belongs to. Leave empty only for platform superusers.',
-    )
     email_verified = models.BooleanField(
         default=False,
         help_text='True after the user confirms their email address.',
@@ -52,5 +44,4 @@ class User(AbstractUser):
         return self.role == self.Roles.STUDENT
 
     def __str__(self):
-        school_part = self.school.slug if self.school_id else 'platform'
-        return f'{self.username} ({self.role}/{school_part})'
+        return f'{self.username} ({self.role})'

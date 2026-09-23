@@ -8,7 +8,6 @@ import {
   schoolHomePath,
   schoolLoginPath,
 } from '../utils/routes'
-import { platformOrigin } from '../utils/tenant'
 
 function brandMark(schoolName: string): string {
   const words = schoolName.trim().split(/\s+/).filter(Boolean)
@@ -61,9 +60,6 @@ export default function SiteHeader() {
       </NavLink>
 
       <nav className="site-nav" aria-label="Main">
-        <a href={platformOrigin() + '/'} className="nav-link">
-          All schools
-        </a>
         <NavLink
           to={schoolHomePath()}
           end

@@ -5,7 +5,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import School, TeachingClass
+from .models import SchoolSettings, TeachingClass
 
 
 class HasSikshavahiniServiceKey(permissions.BasePermission):
@@ -44,19 +44,17 @@ class SikshavahiniClassCatalogView(APIView):
     permission_classes = [HasSikshavahiniServiceKey]
 
     def get(self, request):
-        school_slug = (request.query_params.get('school') or '').strip().lower()
-        qs = TeachingClass.objects.filter(is_active=True).select_related('school')
-        if school_slug:
-            qs = qs.filter(school__slug=school_slug)
+        settings = SchoolSettings.objects.first()
+        qs = TeachingClass.objects.filter(is_active=True)
         data = [
             {
                 'id': tc.id,
                 'name': tc.name,
-                'school_slug': tc.school.slug,
-                'school_name': tc.school.name,
+                'school_slug': settings.school_slug if settings else '',
+                'school_name': settings.school_name if settings else '',
                 'description': tc.description or '',
             }
-            for tc in qs.order_by('school__name', 'name')
+            for tc in qs.order_by('name')
         ]
         return Response({'classes': data})
 
@@ -68,12 +66,13 @@ class SikshavahiniSchoolsCatalogView(APIView):
     permission_classes = [HasSikshavahiniServiceKey]
 
     def get(self, request):
-        schools = School.objects.filter(is_active=True).order_by('name')
+        settings = SchoolSettings.objects.first()
         return Response(
             {
-                'schools': [
-                    {'id': s.id, 'name': s.name, 'slug': s.slug} for s in schools
-                ]
+                'schools': (
+                    [{'id': settings.id, 'name': settings.school_name, 'slug': settings.school_slug}]
+                    if settings else []
+                )
             }
         )
 
@@ -85,22 +84,21 @@ class SunaadamClassCatalogView(APIView):
     permission_classes = [HasSunaadamServiceKey]
 
     def get(self, request):
-        school_slug = (request.query_params.get('school') or '').strip().lower()
+        settings = SchoolSettings.objects.first()
         qs = TeachingClass.objects.filter(
             is_active=True,
-            school__lesson_app=School.LessonApp.SUNAADAM,
-        ).select_related('school')
-        if school_slug:
-            qs = qs.filter(school__slug=school_slug)
+        )
+        if settings and settings.lesson_app != SchoolSettings.LessonApp.SUNAADAM:
+            qs = qs.none()
         data = [
             {
                 'id': tc.id,
                 'name': tc.name,
-                'school_slug': tc.school.slug,
-                'school_name': tc.school.name,
+                'school_slug': settings.school_slug if settings else '',
+                'school_name': settings.school_name if settings else '',
                 'description': tc.description or '',
             }
-            for tc in qs.order_by('school__name', 'name')
+            for tc in qs.order_by('name')
         ]
         return Response({'classes': data})
 
@@ -112,14 +110,13 @@ class SunaadamSchoolsCatalogView(APIView):
     permission_classes = [HasSunaadamServiceKey]
 
     def get(self, request):
-        schools = School.objects.filter(
-            is_active=True,
-            lesson_app=School.LessonApp.SUNAADAM,
-        ).order_by('name')
+        settings = SchoolSettings.objects.first()
         return Response(
             {
-                'schools': [
-                    {'id': s.id, 'name': s.name, 'slug': s.slug} for s in schools
-                ]
+                'schools': (
+                    [{'id': settings.id, 'name': settings.school_name, 'slug': settings.school_slug}]
+                    if settings and settings.lesson_app == SchoolSettings.LessonApp.SUNAADAM
+                    else []
+                )
             }
         )

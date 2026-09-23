@@ -36,20 +36,15 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = env_bool('DJANGO_DEBUG', True)
 
-# Shared with the UI (VITE_APP_DOMAIN). School sites are
-# {slug}{TENANT_HOST_SUFFIX}.{APP_DOMAIN}.
+# Public hostname for this school deployment (used in email links).
 APP_DOMAIN = (
     os.environ.get('APP_DOMAIN')
     or os.environ.get('VITE_APP_DOMAIN')
     or 'localhost'
 ).strip().lower()
-TENANT_HOST_SUFFIX = os.environ.get('TENANT_HOST_SUFFIX', '').strip().lower()
-# The platform picker can have its own first-level hostname in test/staging,
-# while production uses the domain apex.
-PLATFORM_HOSTNAME = (
-    os.environ.get('PLATFORM_HOSTNAME')
-    or APP_DOMAIN
-).strip().lower()
+# When the database still contains more than one school row, this slug
+# selects the school this process should serve.
+SCHOOL_SLUG = os.environ.get('SCHOOL_SLUG', '').strip().lower()
 
 # Always allow local/docker service names; set DJANGO_ALLOWED_HOSTS per
 # deployment (comma-separated). Use "*" only for quick VM demos.
@@ -69,12 +64,6 @@ _local_csrf_origins = [
     'http://127.0.0.1:8080',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    'http://uk-telugu.localhost',
-    'http://balavikas.localhost',
-    'http://uk-telugu.localhost:80',
-    'http://balavikas.localhost:80',
-    'http://uk-telugu.localhost:8080',
-    'http://balavikas.localhost:8080',
 ]
 # CSRF_TRUSTED_ORIGINS is the deployment setting. Keep the old
 # DJANGO_CSRF_TRUSTED_ORIGINS name as a temporary compatibility fallback.

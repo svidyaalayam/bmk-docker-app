@@ -177,7 +177,6 @@ class PendingUsersView(APIView):
     def get(self, request):
         users = (
             User.objects.filter(
-                school=request.user.school,
                 email_verified=True,
                 is_active=False,
             )
@@ -192,7 +191,7 @@ class ActivateUserView(APIView):
 
     def post(self, request, user_id):
         try:
-            user = User.objects.get(pk=user_id, school=request.user.school)
+            user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
         if user.role == User.Roles.ADMIN:
@@ -209,7 +208,7 @@ class DeactivateUserView(APIView):
 
     def post(self, request, user_id):
         try:
-            user = User.objects.get(pk=user_id, school=request.user.school)
+            user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
         if user.id == request.user.id:
@@ -226,7 +225,6 @@ class AdminDashboardView(APIView):
 
     def get(self, request):
         pending = User.objects.filter(
-            school=request.user.school,
             email_verified=True,
             is_active=False,
         ).count()
@@ -267,10 +265,18 @@ class StudentDashboardView(APIView):
     permission_classes = [IsStudentRole]
 
     def get(self, request):
+        student = getattr(request.user, 'student_profile', None)
+        account_blocked = bool(student and student.account_blocked)
         return Response(
             {
                 'dashboard': 'student',
-                'message': f'Welcome Student {request.user.email}',
+                'message': (
+                    'Your account is blocked. Please request activation from the Admin team.'
+                    if account_blocked
+                    else f'Welcome Student {request.user.email}'
+                ),
+                'account_blocked': account_blocked,
+                'block_reason': student.block_reason if account_blocked else '',
                 'capabilities': [
                     'View your classes and calendar',
                     'Add comments on your session records',

@@ -32,8 +32,9 @@ services:
       SEED_ON_START: ${SEED_ON_START:-true}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
-      TENANT_HOST_SUFFIX: ${TENANT_HOST_SUFFIX:-}
-      PLATFORM_HOSTNAME: ${PLATFORM_HOSTNAME:-}
+      SCHOOL_SLUG: ${SCHOOL_SLUG:-uk-telugu}
+      SCHOOL_NAME: ${SCHOOL_NAME:-UK Telugu}
+      SCHOOL_LESSON_APP: ${SCHOOL_LESSON_APP:-sikshavahini}
       PORT: 8000
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
       EMAIL_HOST: ${EMAIL_HOST:-}
@@ -67,8 +68,6 @@ services:
       context: ./bmk-ui
       args:
         VITE_APP_DOMAIN: ${VITE_APP_DOMAIN:-localhost}
-        VITE_TENANT_HOST_SUFFIX: ${VITE_TENANT_HOST_SUFFIX:-}
-        VITE_PLATFORM_HOSTNAME: ${VITE_PLATFORM_HOSTNAME:-}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
         VITE_APP_ENV: ${VITE_APP_ENV:-local}
         VITE_SIKSHAVAHINI_URL: ${VITE_SIKSHAVAHINI_URL:-http://localhost:8180}

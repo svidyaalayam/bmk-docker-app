@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import {
   createComment,
   createSession,
+  blockClassStudent,
   deleteComment,
   deleteSession,
   deleteSessionMaterial,
@@ -45,6 +46,16 @@ function personLabel(p: PersonBrief): string {
   return name ? `${name} (${email})` : email
 }
 
+function personName(p: PersonBrief): string {
+  return `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email || p.username
+}
+
+function personInitials(p: PersonBrief): string {
+  const initials = `${p.first_name?.[0] || ''}${p.last_name?.[0] || ''}`.toUpperCase()
+  if (initials) return initials
+  return (p.username || p.email || '?').slice(0, 2).toUpperCase()
+}
+
 function formatSessionDate(isoDate: string): string {
   const d = new Date(`${isoDate}T00:00:00`)
   if (Number.isNaN(d.getTime())) return isoDate
@@ -54,6 +65,16 @@ function formatSessionDate(isoDate: string): string {
     month: 'short',
     year: 'numeric',
   })
+}
+
+function isFutureSession(isoDate: string): boolean {
+  const today = new Date()
+  const todayIso = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-')
+  return isoDate > todayIso
 }
 
 function presentSummary(present: number, total: number): string {
@@ -110,6 +131,8 @@ export default function ClassDetailPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [savingDesc, setSavingDesc] = useState(false)
+  const [blockingStudent, setBlockingStudent] = useState<PersonBrief | null>(null)
+  const [blockReason, setBlockReason] = useState('')
 
   const refresh = useCallback(async () => {
     const data = await getClass(id)
@@ -144,6 +167,24 @@ export default function ClassDetailPage() {
       setError(getErrorMessage(err, 'Could not save description.'))
     } finally {
       setSavingDesc(false)
+    }
+  }
+
+  const openBlockStudent = (student: PersonBrief) => {
+    setBlockReason('absent for the last 3 consecutive classes.')
+    setBlockingStudent(student)
+  }
+
+  const submitBlockStudent = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!detail || !blockingStudent) return
+    try {
+      await blockClassStudent(detail.id, blockingStudent.id, blockReason)
+      setBlockingStudent(null)
+      setMessage(`${personName(blockingStudent)} has been blocked.`)
+      await refresh()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not block this student.'))
     }
   }
 
@@ -229,12 +270,92 @@ export default function ClassDetailPage() {
               {isTeacher && (
                 <>
                   <h3>Students ({detail.students.length})</h3>
-                  <ul>
-                    {detail.students.map((s) => (
-                      <li key={s.id}>{personLabel(s)}</li>
-                    ))}
-                    {detail.students.length === 0 && <li>No students enrolled.</li>}
-                  </ul>
+                  <div className="table-wrap student-summary-table-wrap">
+                    <table className="student-summary-table">
+                      <thead>
+                        <tr>
+                          <th>Student</th>
+                          <th>Attendance</th>
+                          <th>Previous classes</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.students.map((s) => (
+                          <tr key={s.id}>
+                            <td>
+                              <div className="student-summary-person">
+                                <span className="attendance-avatar" aria-hidden={!s.avatar_url}>
+                                  {s.avatar_url ? (
+                                    <img src={s.avatar_url} alt="" />
+                                  ) : (
+                                    personInitials(s)
+                                  )}
+                                </span>
+                                <span>
+                                  <strong>{personName(s)}</strong>
+                                  {s.email && <span className="muted">{s.email}</span>}
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              {s.attendance_present ?? 0}/{s.attendance_total ?? 0}
+                            </td>
+                            <td>
+                              <div className="recent-attendance-list">
+                                {(s.attendance_recent || []).map((recent) => {
+                                  if (!recent.status) {
+                                    return (
+                                      <span
+                                        key={recent.date}
+                                        className="att-legend recent-attendance-pill attendance-not-enrolled"
+                                        title={`${formatSessionDate(recent.date)}: Student was not enrolled`}
+                                      >
+                                        —
+                                      </span>
+                                    )
+                                  }
+                                  const option = ATTENDANCE_OPTIONS.find(
+                                    (item) => item.status === recent.status,
+                                  ) || ATTENDANCE_OPTIONS[ATTENDANCE_OPTIONS.length - 1]
+                                  return (
+                                    <span
+                                      key={recent.date}
+                                      className={`att-legend recent-attendance-pill ${option.className}`}
+                                      title={`${formatSessionDate(recent.date)}: ${option.title}`}
+                                    >
+                                      {option.short}
+                                    </span>
+                                  )
+                                })}
+                                {(!s.attendance_recent || s.attendance_recent.length === 0) && (
+                                  <span className="muted">—</span>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              {s.account_blocked ? (
+                                <span className="student-blocked-pill">Blocked</span>
+                              ) : s.can_block ? (
+                                <button
+                                  type="button"
+                                  className="home-btn danger"
+                                  onClick={() => openBlockStudent(s)}
+                                >
+                                  Block
+                                </button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        ))}
+                        {detail.students.length === 0 && (
+                          <tr>
+                            <td colSpan={4}>No students enrolled.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </>
               )}
             </section>
@@ -324,6 +445,38 @@ export default function ClassDetailPage() {
               />
             )}
           </>
+        )}
+        {blockingStudent && (
+          <div className="modal-backdrop" role="presentation" onClick={() => setBlockingStudent(null)}>
+            <div
+              className="dash-panel edit-user-modal block-student-modal"
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2>Block student</h2>
+              <p>Are you sure you want to block this student. Once Blocked only Admins can unblock</p>
+              <form className="admin-form" onSubmit={submitBlockStudent}>
+                <label>
+                  Reason for blocking
+                  <textarea
+                    rows={4}
+                    value={blockReason}
+                    onChange={(e) => setBlockReason(e.target.value)}
+                    required
+                  />
+                </label>
+                <div className="form-actions">
+                  <button type="button" className="tab" onClick={() => setBlockingStudent(null)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="home-btn danger">
+                    Block student
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -649,9 +802,26 @@ function SessionPanel({
           {session.is_started ? (
             <span className="session-started-pill large">Started</span>
           ) : (
-            <button type="button" className="home-btn" onClick={handleStart}>
-              Start class
-            </button>
+            <>
+              <button
+                type="button"
+                className="home-btn"
+                onClick={handleStart}
+                disabled={isFutureSession(session.session_date)}
+                title={
+                  isFutureSession(session.session_date)
+                    ? 'This class can be started on or after its date.'
+                    : undefined
+                }
+              >
+                Start class
+              </button>
+              {isFutureSession(session.session_date) && (
+                <span className="header-sub">
+                  This class can be started on or after its scheduled date.
+                </span>
+              )}
+            </>
           )}
         </div>
       )}
@@ -718,7 +888,14 @@ function SessionPanel({
                   className={`attendance-name${focusStudentId === row.student.id ? ' selected' : ''}`}
                   onClick={() => setFocusStudentId(row.student.id)}
                 >
-                  {personLabel(row.student)}
+                  <span className="attendance-avatar" aria-hidden={!row.student.avatar_url}>
+                    {row.student.avatar_url ? (
+                      <img src={row.student.avatar_url} alt="" />
+                    ) : (
+                      personInitials(row.student)
+                    )}
+                  </span>
+                  <span>{personLabel(row.student)}</span>
                 </button>
               </li>
             ))}
@@ -840,13 +1017,18 @@ function SessionPanel({
         </p>
       )}
 
-      <h3>Your homework submissions</h3>
-      {isStudent && (
+      <h3>Student's homework submissions</h3>
+      {isStudent && session.is_started && (
         <MediaCaptureUpload
           label="Choose homework file"
           maxBytes={10 * 1024 * 1024}
           onUpload={handleUpload}
         />
+      )}
+      {isStudent && !session.is_started && (
+        <p className="header-sub">
+          Homework submission opens after the class is started.
+        </p>
       )}
 
       <ul className="homework-list">

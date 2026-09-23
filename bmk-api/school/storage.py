@@ -31,7 +31,9 @@ def _safe_filename(filename: str) -> str:
 
 
 def student_homework_upload_to(instance, filename: str) -> str:
-    school_slug = instance.session.teaching_class.school.slug
+    from .models import SchoolSettings
+
+    school_slug = SchoolSettings.objects.values_list('school_slug', flat=True).first() or 'school'
     class_id = instance.session.teaching_class_id
     session_id = instance.session_id
     student_id = instance.student_id
@@ -42,7 +44,9 @@ def student_homework_upload_to(instance, filename: str) -> str:
 
 
 def session_material_upload_to(instance, filename: str) -> str:
-    school_slug = instance.session.teaching_class.school.slug
+    from .models import SchoolSettings
+
+    school_slug = SchoolSettings.objects.values_list('school_slug', flat=True).first() or 'school'
     class_id = instance.session.teaching_class_id
     session_id = instance.session_id
     kind = (instance.kind or 'material').lower()

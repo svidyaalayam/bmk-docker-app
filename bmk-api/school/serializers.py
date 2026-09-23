@@ -3,95 +3,9 @@ from django.db import transaction
 from rest_framework import serializers
 
 from authentication.serializers import UserSerializer
-from .models import AdminRequest, Course, CourseClass, School, SchoolSettings, SchoolSubtype, SchoolType, Student, StudentTeacherRequest, Teacher
+from .models import AdminRequest, Course, CourseClass, SchoolSettings, Student, StudentTeacherRequest, Teacher
 
 User = get_user_model()
-
-
-class SchoolSerializer(serializers.ModelSerializer):
-    logo_url = serializers.SerializerMethodField()
-    type_slug = serializers.SerializerMethodField()
-    type_name = serializers.SerializerMethodField()
-    subtype_slug = serializers.SerializerMethodField()
-    subtype_name = serializers.SerializerMethodField()
-    type_display_order = serializers.SerializerMethodField()
-    subtype_display_order = serializers.SerializerMethodField()
-
-    class Meta:
-        model = School
-        fields = (
-            'id',
-            'name',
-            'slug',
-            'domain',
-            'logo_url',
-            'type_slug',
-            'type_name',
-            'type_display_order',
-            'subtype_slug',
-            'subtype_name',
-            'subtype_display_order',
-        )
-
-    def get_logo_url(self, obj):
-        settings = getattr(obj, 'settings', None)
-        if not settings or not settings.logo:
-            return None
-        return settings.logo.url
-
-    def get_type_slug(self, obj):
-        if obj.subtype_id and obj.subtype:
-            return obj.subtype.school_type.slug
-        return None
-
-    def get_type_name(self, obj):
-        if obj.subtype_id and obj.subtype:
-            return obj.subtype.school_type.name
-        return None
-
-    def get_type_display_order(self, obj):
-        if obj.subtype_id and obj.subtype:
-            return obj.subtype.school_type.display_order
-        return 999
-
-    def get_subtype_slug(self, obj):
-        return obj.subtype.slug if obj.subtype_id and obj.subtype else None
-
-    def get_subtype_name(self, obj):
-        return obj.subtype.name if obj.subtype_id and obj.subtype else None
-
-    def get_subtype_display_order(self, obj):
-        return obj.subtype.display_order if obj.subtype_id and obj.subtype else 999
-
-
-class SchoolCatalogSchoolSerializer(serializers.ModelSerializer):
-    logo_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = School
-        fields = ('id', 'name', 'slug', 'domain', 'logo_url')
-
-    def get_logo_url(self, obj):
-        settings = getattr(obj, 'settings', None)
-        if not settings or not settings.logo:
-            return None
-        return settings.logo.url
-
-
-class SchoolCatalogSubtypeSerializer(serializers.ModelSerializer):
-    schools = SchoolCatalogSchoolSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = SchoolSubtype
-        fields = ('id', 'name', 'slug', 'display_order', 'schools')
-
-
-class SchoolCatalogSerializer(serializers.ModelSerializer):
-    subtypes = SchoolCatalogSubtypeSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = SchoolType
-        fields = ('id', 'name', 'slug', 'display_order', 'subtypes')
 
 
 class CourseClassSerializer(serializers.ModelSerializer):
@@ -119,8 +33,7 @@ class CourseSerializer(serializers.ModelSerializer):
 
 
 class SchoolSettingsSerializer(serializers.ModelSerializer):
-    school_slug = serializers.CharField(source='school.slug', read_only=True)
-    school_id = serializers.IntegerField(source='school.id', read_only=True)
+    school_id = serializers.IntegerField(source='id', read_only=True)
     logo_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -129,6 +42,7 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'school_id',
             'school_slug',
             'school_name',
+            'lesson_app',
             'logo_url',
             'tagline',
             'introduction',
@@ -185,6 +99,8 @@ class StudentSerializer(serializers.ModelSerializer):
             'parent_phone',
             'address',
             'notes',
+            'account_blocked',
+            'block_reason',
             'is_active',
             'created_at',
             'updated_at',
@@ -226,6 +142,8 @@ class StudentUpdateSerializer(serializers.Serializer):
     parent_phone = serializers.CharField(required=False, allow_blank=True)
     address = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+    account_blocked = serializers.BooleanField(required=False)
+    block_reason = serializers.CharField(required=False, allow_blank=True)
     is_active = serializers.BooleanField(required=False)
 
     @transaction.atomic
@@ -291,11 +209,7 @@ class BaseUserCreateSerializer(serializers.Serializer):
         return value
 
     def _school_from_request(self):
-        request = self.context['request']
-        school = getattr(request.user, 'school', None)
-        if school is None:
-            raise serializers.ValidationError('Admin user is not linked to a school.')
-        return school
+        return None
 
 
 class AdminUserCreateSerializer(BaseUserCreateSerializer):

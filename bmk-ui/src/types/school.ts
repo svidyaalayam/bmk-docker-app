@@ -12,6 +12,8 @@ export interface StudentProfile {
   parent_phone: string
   address: string
   notes: string
+  account_blocked: boolean
+  block_reason: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -51,5 +53,7 @@ export interface UpdateStudentPayload {
   parent_phone?: string
   address?: string
   notes?: string
+  account_blocked?: boolean
+  block_reason?: string
   is_active?: boolean
 }

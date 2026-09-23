@@ -15,6 +15,7 @@ from .class_views import (
     SessionMaterialListCreateView,
     TeachingClassDetailView,
     TeachingClassListCreateView,
+    TeachingClassStudentBlockView,
     TeachingClassStudentRemoveView,
     TeachingClassStudentsView,
 )
@@ -33,7 +34,6 @@ from .views import (
     TeacherRequestListView,
     FirebaseUserImportView,
     HomepageContentView,
-    SchoolListView,
     SchoolSettingsPublicView,
     StudentDetailView,
     StudentListView,
@@ -44,7 +44,6 @@ from .views import (
 )
 
 urlpatterns = [
-    path('public/schools/', SchoolListView.as_view(), name='public-schools'),
     path('public/homepage/', HomepageContentView.as_view(), name='public-homepage'),
     path('public/school/', SchoolSettingsPublicView.as_view(), name='public-school-settings'),
     path(
@@ -83,6 +82,11 @@ urlpatterns = [
     path('classes/', TeachingClassListCreateView.as_view(), name='class-list'),
     path('classes/<int:pk>/', TeachingClassDetailView.as_view(), name='class-detail'),
     path('classes/<int:pk>/students/', TeachingClassStudentsView.as_view(), name='class-students'),
+    path(
+        'classes/<int:pk>/students/<int:student_id>/block/',
+        TeachingClassStudentBlockView.as_view(),
+        name='class-student-block',
+    ),
     path(
         'classes/<int:pk>/students/<int:student_id>/',
         TeachingClassStudentRemoveView.as_view(),

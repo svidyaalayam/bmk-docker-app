@@ -4,17 +4,12 @@ import type { DashboardPayload, LoginResponse, User } from '../types/auth'
 export async function login(
   username: string,
   password: string,
-  schoolSlug?: string,
 ): Promise<LoginResponse> {
   const body =
     username.includes('@')
       ? { email: username.trim().toLowerCase(), password }
       : { username: username.trim(), password }
-  const { data } = await api.post<LoginResponse>(
-    '/api/auth/login/',
-    body,
-    schoolSlug ? { params: { school: schoolSlug } } : undefined,
-  )
+  const { data } = await api.post<LoginResponse>('/api/auth/login/', body)
   return data
 }
 
@@ -77,24 +72,20 @@ export interface TeacherRegisterPayload {
 
 export async function registerStudent(
   payload: StudentRegisterPayload,
-  schoolSlug: string,
 ): Promise<{ detail: string }> {
   const { data } = await api.post<{ detail: string }>(
     '/api/auth/register/student/',
     payload,
-    { params: { school: schoolSlug } },
   )
   return data
 }
 
 export async function registerTeacher(
   payload: TeacherRegisterPayload,
-  schoolSlug: string,
 ): Promise<{ detail: string }> {
   const { data } = await api.post<{ detail: string }>(
     '/api/auth/register/teacher/',
     payload,
-    { params: { school: schoolSlug } },
   )
   return data
 }
@@ -106,12 +97,10 @@ export async function confirmEmail(uid: string, token: string): Promise<{ detail
 
 export async function requestPasswordReset(
   email: string,
-  schoolSlug?: string,
 ): Promise<{ detail: string }> {
   const { data } = await api.post<{ detail: string }>(
     '/api/auth/password-reset/',
     { email },
-    schoolSlug ? { params: { school: schoolSlug } } : undefined,
   )
   return data
 }

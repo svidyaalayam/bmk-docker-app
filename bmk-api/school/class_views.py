@@ -29,10 +29,12 @@ from .models import (
     ClassSessionComment,
     ClassSessionHomework,
     ClassSessionMaterial,
+    SchoolSettings,
     Student,
     TeachingClass,
 )
 from .storage import apply_storage_metadata, delete_stored_file, homework_storage_backend_name
+from .tenancy import resolve_school
 
 ALLOWED_HOMEWORK_TYPES = {
     'image/jpeg',
@@ -59,7 +61,7 @@ MAX_MATERIAL_BYTES = 20 * 1024 * 1024
 
 
 def _school(user):
-    return user.school
+    return resolve_school(required=True)
 
 
 def _teacher_profile(user):
@@ -83,7 +85,7 @@ def _is_student(user):
 
 
 def _classes_for_user(user):
-    qs = TeachingClass.objects.filter(school=_school(user), is_active=True)
+    qs = TeachingClass.objects.filter(is_active=True)
     if _is_admin(user):
         return qs
     if _is_teacher(user):
@@ -93,15 +95,13 @@ def _classes_for_user(user):
         return qs.filter(Q(teacher_1=teacher) | Q(teacher_2=teacher))
     if _is_student(user):
         student = _student_profile(user)
-        if not student:
+        if not student or student.account_blocked:
             return qs.none()
         return qs.filter(memberships__student=student).distinct()
     return qs.none()
 
 
 def _user_can_manage_class(user, teaching_class):
-    if teaching_class.school_id != getattr(_school(user), 'id', None):
-        return False
     if _is_admin(user):
         return True
     if _is_teacher(user):
@@ -123,6 +123,7 @@ def _user_can_view_class(user, teaching_class):
         student = _student_profile(user)
         return bool(
             student
+            and not student.account_blocked
             and teaching_class.memberships.filter(student=student).exists()
         )
     return False
@@ -185,7 +186,7 @@ class TeachingClassDetailView(APIView):
                     ),
                 ),
                 'students__user',
-            ).get(pk=pk, school=_school(request.user))
+            ).get(pk=pk)
         except TeachingClass.DoesNotExist:
             return None
 
@@ -253,6 +254,69 @@ class TeachingClassDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class TeachingClassStudentBlockView(APIView):
+    permission_classes = [IsTeacherRole]
+
+    def post(self, request, pk, student_id):
+        try:
+            teaching_class = TeachingClass.objects.get(pk=pk)
+            student = Student.objects.select_related('user').get(pk=student_id)
+        except (TeachingClass.DoesNotExist, Student.DoesNotExist):
+            return Response({'detail': 'Not found.'}, status=404)
+
+        if not _user_can_manage_class(request.user, teaching_class):
+            return Response({'detail': 'Not allowed.'}, status=403)
+        if not teaching_class.memberships.filter(student=student).exists():
+            return Response({'detail': 'Student is not enrolled in this class.'}, status=400)
+        if student.account_blocked:
+            return Response({'detail': 'Student account is already blocked.'}, status=400)
+
+        school_settings = SchoolSettings.objects.order_by('id').first()
+        block_threshold = (
+            school_settings.unauthorised_absence_block_threshold
+            if school_settings
+            else 3
+        )
+        sessions = list(
+            ClassSession.objects.filter(
+                teaching_class=teaching_class,
+                is_started=True,
+                session_date__lte=timezone.localdate(),
+            ).order_by('-session_date', '-id')[:block_threshold]
+        )
+        records = {
+            record.session_id: record.status
+            for record in ClassSessionAttendance.objects.filter(
+                session__in=sessions,
+                student=student,
+            )
+        }
+        if len(sessions) < block_threshold or any(
+            records.get(session.id) != ClassSessionAttendance.Status.UNAUTHORISED_ABSENT
+            for session in sessions
+        ):
+            return Response(
+                {
+                    'detail': (
+                        'Student must be unauthorised absent for the last '
+                        f'{block_threshold} started classes.'
+                    ),
+                },
+                status=400,
+            )
+
+        reason = str(request.data.get('reason') or '').strip()
+        student.account_blocked = True
+        student.block_reason = reason or 'absent for the last 3 consecutive classes.'
+        student.updated_by = request.user
+        student.save(update_fields=['account_blocked', 'block_reason', 'updated_by', 'updated_at'])
+        return Response({
+            'student_id': student.id,
+            'account_blocked': student.account_blocked,
+            'block_reason': student.block_reason,
+        })
+
+
 class TeachingClassStudentsView(APIView):
     """Admin add students: POST {student_ids: [1,2]}."""
 
@@ -260,7 +324,7 @@ class TeachingClassStudentsView(APIView):
 
     def post(self, request, pk):
         try:
-            teaching_class = TeachingClass.objects.get(pk=pk, school=_school(request.user))
+            teaching_class = TeachingClass.objects.get(pk=pk)
         except TeachingClass.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
 
@@ -268,7 +332,7 @@ class TeachingClassStudentsView(APIView):
         if not isinstance(ids, list):
             return Response({'student_ids': 'Expected a list of ids.'}, status=400)
 
-        students = Student.objects.filter(school=_school(request.user), pk__in=ids)
+        students = Student.objects.filter(pk__in=ids)
         added = []
         for student in students:
             membership, created = ClassMembership.objects.get_or_create(
@@ -286,7 +350,7 @@ class TeachingClassStudentRemoveView(APIView):
 
     def delete(self, request, pk, student_id):
         try:
-            teaching_class = TeachingClass.objects.get(pk=pk, school=_school(request.user))
+            teaching_class = TeachingClass.objects.get(pk=pk)
         except TeachingClass.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
         deleted, _ = teaching_class.memberships.filter(student_id=student_id).delete()
@@ -300,7 +364,7 @@ class ClassSessionListCreateView(APIView):
 
     def get(self, request, pk):
         try:
-            teaching_class = TeachingClass.objects.get(pk=pk, school=_school(request.user))
+            teaching_class = TeachingClass.objects.get(pk=pk)
         except TeachingClass.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
         if not _user_can_view_class(request.user, teaching_class):
@@ -312,7 +376,7 @@ class ClassSessionListCreateView(APIView):
 
     def post(self, request, pk):
         try:
-            teaching_class = TeachingClass.objects.get(pk=pk, school=_school(request.user))
+            teaching_class = TeachingClass.objects.get(pk=pk)
         except TeachingClass.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
         if not (_is_admin(request.user) or _user_can_manage_class(request.user, teaching_class)):
@@ -341,7 +405,7 @@ class ClassCalendarImportView(APIView):
 
     def post(self, request, pk):
         try:
-            teaching_class = TeachingClass.objects.get(pk=pk, school=_school(request.user))
+            teaching_class = TeachingClass.objects.get(pk=pk)
         except TeachingClass.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
 
@@ -399,7 +463,6 @@ class ClassSessionDetailView(APIView):
         try:
             return ClassSession.objects.select_related('teaching_class').get(
                 pk=pk,
-                teaching_class__school=_school(request.user),
             )
         except ClassSession.DoesNotExist:
             return None
@@ -475,7 +538,6 @@ class ClassSessionStartView(APIView):
         try:
             session = ClassSession.objects.select_related('teaching_class').get(
                 pk=pk,
-                teaching_class__school=_school(request.user),
             )
         except ClassSession.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
@@ -484,6 +546,11 @@ class ClassSessionStartView(APIView):
             return Response({'detail': 'Not allowed.'}, status=403)
         if session.is_started:
             return Response({'detail': 'Class already started.', 'session': ClassSessionSerializer(session).data}, status=400)
+        if session.session_date > timezone.localdate():
+            return Response(
+                {'detail': 'Future class sessions cannot be started before their date.'},
+                status=400,
+            )
 
         session.is_started = True
         session.started_at = timezone.now()
@@ -517,7 +584,6 @@ class SessionAttendanceListView(APIView):
         try:
             session = ClassSession.objects.select_related('teaching_class').get(
                 pk=pk,
-                teaching_class__school=_school(request.user),
             )
         except ClassSession.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
@@ -548,7 +614,6 @@ class SessionAttendanceUpdateView(APIView):
             ).get(
                 pk=attendance_id,
                 session_id=pk,
-                session__teaching_class__school=_school(request.user),
             )
         except ClassSessionAttendance.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
@@ -591,7 +656,6 @@ class SessionCommentListCreateView(APIView):
         try:
             session = ClassSession.objects.select_related('teaching_class').get(
                 pk=pk,
-                teaching_class__school=_school(request.user),
             )
         except ClassSession.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
@@ -619,7 +683,6 @@ class SessionCommentListCreateView(APIView):
         try:
             session = ClassSession.objects.select_related('teaching_class').get(
                 pk=pk,
-                teaching_class__school=_school(request.user),
             )
         except ClassSession.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
@@ -643,7 +706,6 @@ class SessionCommentListCreateView(APIView):
             try:
                 target_student = Student.objects.get(
                     pk=sid,
-                    school=_school(request.user),
                     class_memberships__teaching_class=session.teaching_class,
                 )
             except Student.DoesNotExist:
@@ -673,7 +735,7 @@ class SessionCommentDetailView(APIView):
             comment = ClassSessionComment.objects.select_related(
                 'session__teaching_class',
                 'author',
-            ).get(pk=pk, session__teaching_class__school=_school(request.user))
+            ).get(pk=pk)
         except ClassSessionComment.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
 
@@ -691,7 +753,7 @@ class SessionCommentDetailView(APIView):
         try:
             comment = ClassSessionComment.objects.select_related(
                 'session__teaching_class',
-            ).get(pk=pk, session__teaching_class__school=_school(request.user))
+            ).get(pk=pk)
         except ClassSessionComment.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
 
@@ -709,7 +771,6 @@ class SessionHomeworkListCreateView(APIView):
         try:
             session = ClassSession.objects.select_related('teaching_class').get(
                 pk=pk,
-                teaching_class__school=_school(request.user),
             )
         except ClassSession.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
@@ -732,7 +793,6 @@ class SessionHomeworkListCreateView(APIView):
         try:
             session = ClassSession.objects.select_related('teaching_class').get(
                 pk=pk,
-                teaching_class__school=_school(request.user),
             )
         except ClassSession.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
@@ -740,6 +800,11 @@ class SessionHomeworkListCreateView(APIView):
         student = _student_profile(request.user)
         if not student or not _user_can_view_class(request.user, session.teaching_class):
             return Response({'detail': 'Not found.'}, status=404)
+        if not session.is_started:
+            return Response(
+                {'detail': 'Homework submission opens after the class is started.'},
+                status=400,
+            )
 
         upload = request.FILES.get('file')
         if not upload:
@@ -779,7 +844,7 @@ class SessionHomeworkDetailView(APIView):
             hw = ClassSessionHomework.objects.select_related(
                 'session__teaching_class',
                 'student__user',
-            ).get(pk=pk, session__teaching_class__school=_school(request.user))
+            ).get(pk=pk)
         except ClassSessionHomework.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
 
@@ -807,7 +872,6 @@ class SessionMaterialListCreateView(APIView):
         try:
             session = ClassSession.objects.select_related('teaching_class').get(
                 pk=pk,
-                teaching_class__school=_school(request.user),
             )
         except ClassSession.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
@@ -826,7 +890,6 @@ class SessionMaterialListCreateView(APIView):
         try:
             session = ClassSession.objects.select_related('teaching_class').get(
                 pk=pk,
-                teaching_class__school=_school(request.user),
             )
         except ClassSession.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
@@ -877,7 +940,7 @@ class SessionMaterialDetailView(APIView):
         try:
             material = ClassSessionMaterial.objects.select_related(
                 'session__teaching_class',
-            ).get(pk=pk, session__teaching_class__school=_school(request.user))
+            ).get(pk=pk)
         except ClassSessionMaterial.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
 

@@ -3,7 +3,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from school.models import School, Student, Teacher
+from school.models import Student, Teacher
 from school.tenancy import resolve_school
 
 from .emails import (
@@ -18,10 +18,10 @@ User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
-    school_id = serializers.IntegerField(source='school.id', read_only=True, allow_null=True)
-    school_slug = serializers.CharField(source='school.slug', read_only=True, allow_null=True)
-    school_name = serializers.CharField(source='school.name', read_only=True, allow_null=True)
-    lesson_app = serializers.CharField(source='school.lesson_app', read_only=True, allow_null=True)
+    school_id = serializers.SerializerMethodField()
+    school_slug = serializers.SerializerMethodField()
+    school_name = serializers.SerializerMethodField()
+    lesson_app = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -53,6 +53,28 @@ class UserSerializer(serializers.ModelSerializer):
             return None
         # Relative /media/... path works with Vite/Nginx proxies.
         return obj.avatar.url
+
+    @staticmethod
+    def _deployment_school():
+        from school.tenancy import resolve_school
+
+        return resolve_school(required=False)
+
+    def get_school_id(self, obj):
+        school = self._deployment_school()
+        return school.id if school else None
+
+    def get_school_slug(self, obj):
+        school = self._deployment_school()
+        return school.school_slug if school else None
+
+    def get_school_name(self, obj):
+        school = self._deployment_school()
+        return school.school_name if school else None
+
+    def get_lesson_app(self, obj):
+        school = self._deployment_school()
+        return school.lesson_app if school else 'sikshavahini'
 
 
 class ProfileUpdateSerializer(serializers.Serializer):
@@ -97,7 +119,7 @@ class AvatarUploadSerializer(serializers.Serializer):
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """JWT login using email (or username) + password, scoped to school."""
+    """JWT login using email (or username) + password for this school."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -114,24 +136,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         raw_login = str(raw_login).strip()
         password = attrs.get('password') or ''
 
-        school_slug = ''
-        if request is not None:
-            query_params = getattr(request, 'query_params', None)
-            if query_params is not None:
-                school_slug = query_params.get('school') or ''
-            if not school_slug:
-                school_slug = request.headers.get('X-School-Slug') or request.META.get('HTTP_X_SCHOOL_SLUG') or ''
-            school_slug = school_slug.strip().lower()
-
-        school = None
+        school = resolve_school(request, required=False) if request is not None else None
         users = User.objects.all()
-        if school_slug:
-            school = School.objects.filter(slug=school_slug, is_active=True).first()
-            users = users.filter(school=school) if school else User.objects.none()
         user = None
         if raw_login:
             if '@' in raw_login:
-                # Users enter their normal email. The selected school supplies the
+                # Users enter their normal email. The school supplies the
                 # permanent UUID suffix used by the private Django username.
                 if school is not None:
                     user = users.filter(
@@ -167,13 +177,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 code='authorization',
             )
 
-        if school_slug:
-            if not user.school_id or user.school.slug != school_slug:
-                raise serializers.ValidationError(
-                    {'detail': 'Invalid credentials for this school.'},
-                    code='authorization',
-                )
-
         self.user = user
         refresh = self.get_token(user)
         return {
@@ -189,11 +192,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['role'] = user.role
         token['username'] = user.username
         token['email'] = user.email or ''
-        token['school_id'] = user.school_id
-        token['school_slug'] = user.school.slug if user.school_id else None
-        token['lesson_app'] = (
-            user.school.lesson_app if user.school_id else 'sikshavahini'
-        )
+        school = resolve_school(required=False)
+        token['school_id'] = school.id if school else None
+        token['school_slug'] = school.school_slug if school else None
+        token['lesson_app'] = school.lesson_app if school else 'sikshavahini'
         # Teaching-class ids for lesson-application view permissions
         try:
             from school.class_views import _classes_for_user
@@ -218,8 +220,10 @@ class StudentRegistrationSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         email = value.strip().lower()
+        if len(email) > 150:
+            raise serializers.ValidationError('Email must be 150 characters or fewer.')
         school = resolve_school(self.context['request'], required=True)
-        if User.objects.filter(school=school, email__iexact=email).exists():
+        if User.objects.filter(email__iexact=email).exists():
             raise serializers.ValidationError('An account with this email already exists.')
         return email
 
@@ -238,7 +242,6 @@ class StudentRegistrationSerializer(serializers.Serializer):
             last_name=validated_data['last_name'].strip(),
             role=User.Roles.STUDENT,
             phone_number=phone,
-            school=school,
             is_active=False,
             email_verified=False,
             profile_locked=True,
@@ -247,7 +250,6 @@ class StudentRegistrationSerializer(serializers.Serializer):
         user.save()
 
         Student.objects.create(
-            school=school,
             user=user,
             gender=validated_data['gender'],
             date_of_birth=validated_data['date_of_birth'],
@@ -268,8 +270,10 @@ class TeacherRegistrationSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         email = value.strip().lower()
+        if len(email) > 150:
+            raise serializers.ValidationError('Email must be 150 characters or fewer.')
         school = resolve_school(self.context['request'], required=True)
-        if User.objects.filter(school=school, email__iexact=email).exists():
+        if User.objects.filter(email__iexact=email).exists():
             raise serializers.ValidationError('An account with this email already exists.')
         return email
 
@@ -288,7 +292,6 @@ class TeacherRegistrationSerializer(serializers.Serializer):
             last_name=validated_data['last_name'].strip(),
             role=User.Roles.TEACHER,
             phone_number=phone,
-            school=school,
             is_active=False,
             email_verified=False,
             profile_locked=True,
@@ -297,7 +300,6 @@ class TeacherRegistrationSerializer(serializers.Serializer):
         user.save()
 
         Teacher.objects.create(
-            school=school,
             user=user,
             gender=validated_data['gender'],
             phone=phone,
@@ -329,9 +331,6 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         user = User.objects.filter(email__iexact=email).first()
         # Always succeed to avoid email enumeration
         if user is not None and user.email:
-            school = resolve_school(request, required=False) if request else None
-            if school and user.school_id and user.school_id != school.id:
-                return None
             send_password_reset_email(user, request)
         return None
 

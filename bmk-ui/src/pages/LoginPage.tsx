@@ -29,7 +29,7 @@ export default function LoginPage() {
     setError('')
     setSubmitting(true)
     try {
-      const loggedIn = await login(email.trim(), password, schoolSlug)
+      const loggedIn = await login(email.trim(), password)
       navigate(dashboardPathForRole(loggedIn.role), { replace: true })
     } catch (err: unknown) {
       const detail =
@@ -40,7 +40,7 @@ export default function LoginPage() {
           'string'
           ? (err as { response: { data: { detail: string } } }).response.data.detail
           : null
-      setError(detail || 'Login failed. Check your email, password, and school.')
+      setError(detail || 'Login failed. Check your email and password.')
     } finally {
       setSubmitting(false)
     }

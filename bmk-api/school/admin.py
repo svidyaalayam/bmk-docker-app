@@ -9,71 +9,27 @@ from .models import (
     ClassSessionMaterial,
     Course,
     CourseClass,
-    School,
     SchoolSettings,
-    SchoolSubtype,
-    SchoolType,
     Student,
     Teacher,
     TeachingClass,
 )
 
 
-class SchoolSettingsInline(admin.StackedInline):
-    model = SchoolSettings
-    can_delete = False
-    extra = 0
-
-
-@admin.register(SchoolType)
-class SchoolTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'display_order', 'is_active')
-    list_editable = ('display_order', 'is_active')
-    prepopulated_fields = {'slug': ('name',)}
-    search_fields = ('name', 'slug')
-
-
-@admin.register(SchoolSubtype)
-class SchoolSubtypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'school_type', 'slug', 'display_order', 'is_active')
-    list_filter = ('school_type', 'is_active')
-    list_editable = ('display_order', 'is_active')
-    prepopulated_fields = {'slug': ('name',)}
-    search_fields = ('name', 'slug', 'school_type__name')
-    autocomplete_fields = ('school_type',)
-
-
-@admin.register(School)
-class SchoolAdmin(admin.ModelAdmin):
-    list_display = (
-        'name',
-        'slug',
-        'school_number',
-        'subtype',
-        'lesson_app',
-        'domain',
-        'is_active',
-        'updated_at',
-    )
-    list_filter = ('lesson_app', 'is_active', 'subtype__school_type', 'subtype')
-    search_fields = ('name', 'slug', 'domain')
-    readonly_fields = ('school_number', 'user_identifier')
-    autocomplete_fields = ('subtype',)
-    inlines = [SchoolSettingsInline]
-
-
 @admin.register(SchoolSettings)
 class SchoolSettingsAdmin(admin.ModelAdmin):
-    list_display = ('school_name', 'school', 'secondary_language', 'updated_at')
-    list_filter = ('secondary_language', 'school')
-    search_fields = ('school_name', 'school__name', 'school__slug')
-    autocomplete_fields = ('school',)
+    list_display = ('school_name', 'school_slug', 'lesson_app', 'secondary_language', 'updated_at')
+    list_filter = ('secondary_language', 'lesson_app')
+    search_fields = ('school_name', 'school_slug')
     fieldsets = (
         ('School', {
-            'fields': ('school', 'school_name', 'logo', 'tagline', 'footer_text'),
+            'fields': ('school_name', 'school_slug', 'school_number', 'lesson_app', 'logo', 'tagline', 'footer_text'),
         }),
         ('Introduction page', {
             'fields': ('introduction', 'secondary_language', 'introduction_secondary'),
+        }),
+        ('Student account blocking', {
+            'fields': ('unauthorised_absence_block_threshold',),
         }),
     )
 
@@ -101,7 +57,6 @@ class CourseClassInline(admin.StackedInline):
 class CourseAdmin(admin.ModelAdmin):
     list_display = (
         'title',
-        'school',
         'display_order',
         'display_language',
         'is_published',
@@ -109,15 +64,13 @@ class CourseAdmin(admin.ModelAdmin):
         'updated_at',
     )
     list_editable = ('display_order', 'display_language', 'is_published')
-    list_filter = ('school', 'display_language', 'is_published', 'is_active')
-    search_fields = ('title', 'summary', 'school__name')
-    autocomplete_fields = ('school',)
-    ordering = ('school__name', 'display_order', 'title')
+    list_filter = ('display_language', 'is_published', 'is_active')
+    search_fields = ('title', 'summary')
+    ordering = ('display_order', 'title')
     inlines = [CourseClassInline]
     fieldsets = (
         (None, {
             'fields': (
-                'school',
                 'title',
                 'summary',
                 'display_order',
@@ -133,7 +86,7 @@ class CourseAdmin(admin.ModelAdmin):
 class CourseClassAdmin(admin.ModelAdmin):
     list_display = ('name', 'course', 'display_order', 'is_published', 'is_active', 'updated_at')
     list_editable = ('display_order', 'is_published')
-    list_filter = ('course__school', 'course', 'is_published', 'is_active')
+    list_filter = ('course', 'is_published', 'is_active')
     search_fields = (
         'name',
         'aim',
@@ -145,7 +98,7 @@ class CourseClassAdmin(admin.ModelAdmin):
         'course__title',
     )
     autocomplete_fields = ('course',)
-    ordering = ('course__school__name', 'course__display_order', 'display_order', 'name')
+    ordering = ('course__display_order', 'display_order', 'name')
     fieldsets = (
         (None, {
             'fields': ('course', 'name', 'display_order', 'is_published', 'is_active'),
@@ -161,20 +114,18 @@ class CourseClassAdmin(admin.ModelAdmin):
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ('user', 'school', 'gender', 'phone', 'parent_name', 'is_active', 'created_at')
-    list_filter = ('school', 'gender', 'is_active')
+    list_display = ('user', 'gender', 'phone', 'parent_name', 'is_active', 'created_at')
+    list_filter = ('gender', 'is_active')
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'parent_name')
     raw_id_fields = ('user', 'created_by', 'updated_by')
-    autocomplete_fields = ('school',)
 
 
 @admin.register(Teacher)
 class TeacherAdmin(admin.ModelAdmin):
-    list_display = ('user', 'school', 'gender', 'phone', 'is_active', 'created_at')
-    list_filter = ('school', 'gender', 'is_active')
+    list_display = ('user', 'gender', 'phone', 'is_active', 'created_at')
+    list_filter = ('gender', 'is_active')
     search_fields = ('user__username', 'user__first_name', 'user__last_name')
     raw_id_fields = ('user', 'created_by', 'updated_by')
-    autocomplete_fields = ('school',)
 
 
 class ClassMembershipInline(admin.TabularInline):
@@ -192,10 +143,9 @@ class ClassSessionInline(admin.TabularInline):
 
 @admin.register(TeachingClass)
 class TeachingClassAdmin(admin.ModelAdmin):
-    list_display = ('name', 'school', 'teacher_1', 'teacher_2', 'is_active', 'updated_at')
-    list_filter = ('school', 'is_active')
+    list_display = ('name', 'teacher_1', 'teacher_2', 'is_active', 'updated_at')
+    list_filter = ('is_active',)
     search_fields = ('name', 'description')
-    autocomplete_fields = ('school',)
     raw_id_fields = ('teacher_1', 'teacher_2', 'created_by', 'updated_by')
     inlines = [ClassMembershipInline, ClassSessionInline]
 
@@ -203,7 +153,7 @@ class TeachingClassAdmin(admin.ModelAdmin):
 @admin.register(ClassSession)
 class ClassSessionAdmin(admin.ModelAdmin):
     list_display = ('teaching_class', 'session_date', 'is_started', 'started_at')
-    list_filter = ('is_started', 'teaching_class__school')
+    list_filter = ('is_started',)
     raw_id_fields = ('teaching_class', 'created_by', 'updated_by')
 
 

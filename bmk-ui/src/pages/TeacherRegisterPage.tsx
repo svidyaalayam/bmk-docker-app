@@ -33,7 +33,6 @@ export default function TeacherRegisterPage() {
           gender,
           phone: phone.trim(),
         },
-        schoolSlug,
       )
       setMessage(data.detail)
     } catch (err) {

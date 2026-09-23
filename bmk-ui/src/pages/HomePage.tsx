@@ -4,7 +4,6 @@ import { useSchoolContent } from "../content/SchoolContentContext";
 import {
   CLASS_SECTION_HEADERS,
   INTRODUCTION_HEADERS,
-  SECONDARY_LANGUAGE_LABELS,
   scriptClassForLanguage,
 } from "../types/content";
 import type { Course, CourseClass, SecondaryLanguage } from "../types/content";
@@ -85,17 +84,10 @@ function ClassDetailPanel({
     ? courseClass.conditions_secondary
     : courseClass.conditions;
 
-  const languageLabel = useSecondary
-    ? SECONDARY_LANGUAGE_LABELS[
-        secondaryLanguage as Exclude<SecondaryLanguage, "">
-      ] || "Secondary"
-    : "English";
-
   return (
     <div className="class-detail-panel" role="tabpanel">
       <div className="class-detail-heading">
         <h4>{courseClass.name}</h4>
-        <span className="class-lang-badge">{languageLabel}</span>
       </div>
 
       <TextBlock
@@ -114,13 +106,6 @@ function ClassDetailPanel({
         language={useSecondary ? secondaryLanguage : undefined}
       />
 
-      {!curriculum && !aim && !conditions && (
-        <p className="muted-note">
-          {useSecondary
-            ? "Secondary-language aim, conditions, and curriculum can be configured in Django admin."
-            : "Aim, conditions, and curriculum can be configured in Django admin."}
-        </p>
-      )}
     </div>
   );
 }
@@ -145,15 +130,7 @@ function CourseBlock({
       <div className="course-block-head">
         <div className="course-block-title-row">
           <h3>{course.title}</h3>
-          <span className="class-lang-badge">
-            {useSecondary
-              ? SECONDARY_LANGUAGE_LABELS[
-                  language as Exclude<SecondaryLanguage, "">
-                ] || "Secondary"
-              : "English"}
-          </span>
         </div>
-        <p>{course.summary || "No summary provided."}</p>
         {course.display_language === "secondary" &&
           !schoolSecondaryLanguage && (
             <p className="muted-note">

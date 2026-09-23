@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
     setError('')
     setMessage('')
     try {
-      const data = await requestPasswordReset(email.trim().toLowerCase(), schoolSlug)
+      const data = await requestPasswordReset(email.trim().toLowerCase())
       setMessage(data.detail)
     } catch (err) {
       setError(getErrorMessage(err, 'Could not send reset email.'))

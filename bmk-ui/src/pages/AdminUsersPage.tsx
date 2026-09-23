@@ -215,6 +215,7 @@ export default function AdminUsersPage() {
   const admins = useMemo(() => users.filter((u) => u.role === 'ADMIN'), [users])
   const filteredStudents = useMemo(() => filterProfiles(students, studentAssignmentFilter, studentRecentFilter), [students, studentAssignmentFilter, studentRecentFilter])
   const filteredTeachers = useMemo(() => filterProfiles(teachers, teacherAssignmentFilter, teacherRecentFilter), [teachers, teacherAssignmentFilter, teacherRecentFilter])
+  const blockedStudents = useMemo(() => students.filter((student) => student.account_blocked), [students])
   const selectedStudents = useMemo(() => students.filter((student) => selectedStudentIds.has(student.id)), [students, selectedStudentIds])
   const selectedTeachers = useMemo(() => teachers.filter((teacher) => selectedTeacherIds.has(teacher.id)), [teachers, selectedTeacherIds])
 
@@ -229,6 +230,18 @@ export default function AdminUsersPage() {
     } catch (err) {
       setError(getErrorMessage(err, 'Could not activate user.'))
       return false
+    }
+  }, [])
+
+  const handleUnblockStudent = useCallback(async (student: StudentProfile) => {
+    setError('')
+    setMessage('')
+    try {
+      await updateStudent(student.id, { account_blocked: false, block_reason: '' })
+      setMessage('Student account unblocked.')
+      await refresh()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not unblock student account.'))
     }
   }, [])
 
@@ -422,6 +435,30 @@ export default function AdminUsersPage() {
     [],
   )
 
+  const blockedStudentColumns = useMemo<DataTableColumn<StudentProfile>[]>(
+    () => [
+      {
+        key: 'name',
+        header: 'Name',
+        getValue: (s) => fullName(s.user.first_name, s.user.last_name),
+      },
+      { key: 'email', header: 'Email', getValue: (s) => s.user.email || '' },
+      { key: 'reason', header: 'Reason for blocking', getValue: (s) => s.block_reason || 'Not provided' },
+      {
+        key: 'actions',
+        header: '',
+        sortable: false,
+        filterable: false,
+        render: (s) => (
+          <button type="button" className="home-btn secondary" onClick={() => handleUnblockStudent(s)}>
+            Unblock
+          </button>
+        ),
+      },
+    ],
+    [handleUnblockStudent],
+  )
+
   const adminColumns = useMemo<DataTableColumn<User>[]>(
     () => [
       {
@@ -597,6 +634,20 @@ export default function AdminUsersPage() {
             searchPlaceholder="Filter students…"
             selectedRowKeys={selectedStudentIds}
             onSelectedRowKeysChange={(keys) => setSelectedStudentIds(new Set([...keys].map(Number)))}
+          />
+        </section>
+
+        <section className="dash-panel">
+          <h2>Blocked Students ({blockedStudents.length})</h2>
+          <p className="header-sub">
+            Students listed here cannot access their classes until unblocked.
+          </p>
+          <DataTable
+            rows={blockedStudents}
+            columns={blockedStudentColumns}
+            rowKey={(s) => s.id}
+            emptyMessage="No students are currently blocked."
+            searchPlaceholder="Filter blocked students…"
           />
         </section>
 
@@ -807,6 +858,12 @@ function EditUserModal({
   const [gender, setGender] = useState<Gender>(profile.gender)
   const [phone, setPhone] = useState(profile.phone || '')
   const [isActive, setIsActive] = useState(Boolean(profile.is_active && user.is_active))
+  const [accountBlocked, setAccountBlocked] = useState(
+    target.kind === 'student' ? Boolean(target.profile.account_blocked) : false,
+  )
+  const [blockReason, setBlockReason] = useState(
+    target.kind === 'student' ? target.profile.block_reason || '' : '',
+  )
   const [dateOfBirth, setDateOfBirth] = useState(
     target.kind === 'student' ? target.profile.date_of_birth || '' : '',
   )
@@ -838,6 +895,8 @@ function EditUserModal({
       payload.parent_phone = parentPhone
       payload.address = address
       payload.notes = notes
+      payload.account_blocked = accountBlocked
+      payload.block_reason = accountBlocked ? blockReason : ''
     }
     await onSave(payload)
   }
@@ -926,6 +985,26 @@ function EditUserModal({
               <label className="full">
                 Notes
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+              </label>
+              <label>
+                Account blocked
+                <select
+                  value={accountBlocked ? 'yes' : 'no'}
+                  onChange={(e) => setAccountBlocked(e.target.value === 'yes')}
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </label>
+              <label className="full">
+                Reason for blocking
+                <textarea
+                  value={blockReason}
+                  onChange={(e) => setBlockReason(e.target.value)}
+                  rows={2}
+                  disabled={!accountBlocked}
+                  placeholder="Explain why this student account is blocked"
+                />
               </label>
             </div>
           )}

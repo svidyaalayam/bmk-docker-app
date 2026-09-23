@@ -9,31 +9,28 @@ class CustomUserAdmin(UserAdmin):
         'username',
         'email',
         'role',
-        'school',
         'email_verified',
         'is_active',
         'is_staff',
     )
     list_filter = (
         'role',
-        'school',
         'email_verified',
         'is_active',
         'is_staff',
         'is_superuser',
     )
     search_fields = ('username', 'email', 'first_name', 'last_name')
-    autocomplete_fields = ('school',)
     fieldsets = UserAdmin.fieldsets + (
         (
             'School Administration Roles',
-            {'fields': ('role', 'phone_number', 'school', 'email_verified', 'profile_locked', 'avatar')},
+            {'fields': ('role', 'phone_number', 'email_verified', 'profile_locked', 'avatar')},
         ),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
         (
             'School Administration Roles',
-            {'fields': ('role', 'phone_number', 'school', 'email_verified', 'profile_locked', 'avatar')},
+            {'fields': ('role', 'phone_number', 'email_verified', 'profile_locked', 'avatar')},
         ),
     )
 

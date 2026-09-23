@@ -1,8 +1,6 @@
-import uuid
-
 from django.contrib.auth import get_user_model
-from django.db import models, transaction
-from django.db.models import Max
+from django.db import models
+from django.core.validators import MinValueValidator
 
 from core.models import AuditModel
 from school.storage import (
@@ -14,118 +12,12 @@ from school.storage import (
 User = get_user_model()
 
 
-class SchoolType(models.Model):
-    """Top-level programme category on the platform home (e.g. Language, Music)."""
-
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=50, unique=True)
-    display_order = models.PositiveIntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        ordering = ['display_order', 'name']
-
-    def __str__(self):
-        return self.name
-
-
-class SchoolSubtype(models.Model):
-    """Subtype under a school type (e.g. Telugu under Language schools)."""
-
-    school_type = models.ForeignKey(
-        SchoolType,
-        on_delete=models.CASCADE,
-        related_name='subtypes',
-    )
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=50)
-    display_order = models.PositiveIntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        ordering = ['display_order', 'name']
-        unique_together = ('school_type', 'slug')
-
-    def __str__(self):
-        return f'{self.school_type.name} → {self.name}'
-
-
-class School(models.Model):
-    """A tenant school in the multi-school platform."""
+class SchoolSettings(models.Model):
+    """Singleton deployment-wide school settings edited in Django admin."""
 
     class LessonApp(models.TextChoices):
         SIKSHAVAHINI = 'sikshavahini', 'Sikshavahini'
         SUNAADAM = 'sunaadam', 'Sunaadam'
-
-    name = models.CharField(max_length=200)
-    user_identifier = models.UUIDField(
-        default=uuid.uuid4,
-        unique=True,
-        editable=False,
-        help_text='Permanent identifier used internally in school user names.',
-    )
-    school_number = models.PositiveIntegerField(
-        unique=True,
-        editable=False,
-        help_text='Permanent short number used in school user-name suffixes.',
-    )
-    # Single DNS label under APP_DOMAIN, e.g. uk-telugu → uk-telugu.localhost.
-    slug = models.CharField(
-        max_length=100,
-        unique=True,
-        help_text='Host prefix under the app domain, e.g. uk-telugu or balamukundam',
-    )
-    domain = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text='Optional full hostname override, e.g. uk-telugu.balamukundam.com',
-    )
-    subtype = models.ForeignKey(
-        SchoolSubtype,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='schools',
-    )
-    lesson_app = models.CharField(
-        max_length=20,
-        choices=LessonApp.choices,
-        default=LessonApp.SIKSHAVAHINI,
-        help_text='Lesson application opened for users of this school.',
-    )
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
-
-    def save(self, *args, **kwargs):
-        if self._state.adding and not self.school_number:
-            with transaction.atomic():
-                last_number = type(self).objects.select_for_update().aggregate(
-                    largest=Max('school_number')
-                )['largest'] or 0
-                self.school_number = last_number + 1
-                return super().save(*args, **kwargs)
-        return super().save(*args, **kwargs)
-
-    @property
-    def type_name(self) -> str:
-        if self.subtype_id and self.subtype:
-            return self.subtype.school_type.name
-        return ''
-
-    @property
-    def subtype_name(self) -> str:
-        return self.subtype.name if self.subtype_id and self.subtype else ''
-
-
-class SchoolSettings(models.Model):
-    """Per-school homepage/content settings edited in Django admin."""
 
     class SecondaryLanguage(models.TextChoices):
         NONE = '', 'None'
@@ -155,7 +47,13 @@ class SchoolSettings(models.Model):
         INDONESIAN = 'id', 'Indonesian'
         VIETNAMESE = 'vi', 'Vietnamese'
 
-    school = models.OneToOneField(School, on_delete=models.CASCADE, related_name='settings')
+    school_slug = models.CharField(max_length=100, default='school')
+    school_number = models.PositiveIntegerField(default=1, unique=True)
+    lesson_app = models.CharField(
+        max_length=20,
+        choices=LessonApp.choices,
+        default=LessonApp.SIKSHAVAHINI,
+    )
     school_name = models.CharField(max_length=200, default='Online School')
     logo = models.ImageField(
         upload_to='school_logos/%Y/%m/',
@@ -179,7 +77,12 @@ class SchoolSettings(models.Model):
         blank=True,
         help_text='Introduction text in the selected secondary language.',
     )
-    footer_text = models.CharField(max_length=255, blank=True, default='')
+    footer_text = models.TextField(blank=True, default='')
+    unauthorised_absence_block_threshold = models.PositiveIntegerField(
+        default=3,
+        validators=[MinValueValidator(1)],
+        help_text='Consecutive unauthorised absences required before a teacher can block a student.',
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -195,7 +98,6 @@ class Course(AuditModel):
         ENGLISH = 'en', 'English'
         SECONDARY = 'secondary', 'Secondary language'
 
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='courses')
     title = models.CharField(max_length=200)
     summary = models.TextField(blank=True)
     display_order = models.PositiveIntegerField(default=0)
@@ -212,10 +114,9 @@ class Course(AuditModel):
 
     class Meta:
         ordering = ['display_order', 'title']
-        unique_together = ('school', 'title')
 
     def __str__(self):
-        return f'{self.school.name} — {self.title}'
+        return self.title
 
 
 class CourseClass(AuditModel):
@@ -262,7 +163,6 @@ class Student(AuditModel):
         BOY = 'M', 'Boy'
         GIRL = 'F', 'Girl'
 
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='students')
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
     gender = models.CharField(max_length=1, choices=Gender.choices)
     date_of_birth = models.DateField(null=True, blank=True)
@@ -271,6 +171,11 @@ class Student(AuditModel):
     parent_phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     notes = models.TextField(blank=True)
+    account_blocked = models.BooleanField(
+        default=False,
+        help_text='Blocked students cannot access classes until an admin unblocks them.',
+    )
+    block_reason = models.TextField(blank=True)
 
     class Meta:
         ordering = ['user__last_name', 'user__first_name', 'user__username']
@@ -285,7 +190,6 @@ class Teacher(AuditModel):
         MALE = 'M', 'Male'
         FEMALE = 'F', 'Female'
 
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='teachers')
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='teacher_profile')
     gender = models.CharField(max_length=1, choices=Gender.choices)
     phone = models.CharField(max_length=20, blank=True)
@@ -301,7 +205,6 @@ class Teacher(AuditModel):
 class TeachingClass(AuditModel):
     """A teaching cohort managed by school admins (separate from curriculum CourseClass)."""
 
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='teaching_classes')
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     teacher_1 = models.ForeignKey(
@@ -327,10 +230,9 @@ class TeachingClass(AuditModel):
         ordering = ['name']
         verbose_name = 'Teaching class'
         verbose_name_plural = 'Teaching classes'
-        unique_together = ('school', 'name')
 
     def __str__(self):
-        return f'{self.school.name} — {self.name}'
+        return self.name
 
 
 class ClassMembership(AuditModel):
@@ -526,7 +428,6 @@ class AdminRequest(models.Model):
         REQUEST = 'REQUEST', 'Request'
         FEEDBACK = 'FEEDBACK', 'Feedback / suggestion'
 
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='admin_requests')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='admin_requests')
     kind = models.CharField(max_length=16, choices=Kind.choices)
     subject = models.CharField(max_length=200)
@@ -547,7 +448,6 @@ class StudentTeacherRequest(models.Model):
         REQUEST = 'REQUEST', 'Request'
         FEEDBACK = 'FEEDBACK', 'Feedback / suggestion'
 
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='student_teacher_requests')
     teaching_class = models.ForeignKey(TeachingClass, on_delete=models.CASCADE, related_name='student_teacher_requests')
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='teacher_requests')
     kind = models.CharField(max_length=16, choices=Kind.choices)
