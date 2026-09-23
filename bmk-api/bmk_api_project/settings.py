@@ -71,8 +71,8 @@ _local_csrf_origins = [
 # environments should list their own HTTPS origins in their env file.
 _csrf_default = _local_csrf_origins if APP_DOMAIN == 'localhost' else []
 CSRF_TRUSTED_ORIGINS = env_list(
-    'CSRF_TRUSTED_ORIGINS',
-    env_list('DJANGO_CSRF_TRUSTED_ORIGINS', _csrf_default),
+    'DJANGO_CSRF_TRUSTED_ORIGINS',
+    env_list('CSRF_TRUSTED_ORIGINS', _csrf_default),
 )
 
 INSTALLED_APPS = [
