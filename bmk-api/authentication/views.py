@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from authentication.permissions import IsAdminRole, IsStudentRole, IsTeacherRole
+from bmk_api_project.version import API_VERSION
 from .emails import send_confirmation_email
 from .serializers import (
     AvatarUploadSerializer,
@@ -233,6 +234,7 @@ class AdminDashboardView(APIView):
                 'dashboard': 'admin',
                 'message': f'Welcome Admin {request.user.email}',
                 'pending_activations': pending,
+                'api_version': API_VERSION,
                 'capabilities': [
                     'Review and activate registered students and teachers',
                     'Manage users and roles',

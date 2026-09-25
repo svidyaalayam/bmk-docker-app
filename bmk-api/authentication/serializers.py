@@ -176,6 +176,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 },
                 code='authorization',
             )
+        if not request or request.data.get('terms_accepted') is not True:
+            raise serializers.ValidationError(
+                {'detail': 'You must accept the Terms & Conditions before signing in.'},
+                code='authorization',
+            )
 
         self.user = user
         refresh = self.get_token(user)

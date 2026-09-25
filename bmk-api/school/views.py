@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from authentication.permissions import IsAdminRole
 from authentication.serializers import UserSerializer
 from authentication.usernames import username_for_school_email
+from .birthday_snapshots import get_daily_birthday_snapshot
 from .models import AdminRequest, Course, CourseClass, Student, StudentTeacherRequest, Teacher, TeachingClass
 from .serializers import (
     HomepageContentSerializer,
@@ -48,6 +49,7 @@ class HomepageContentView(APIView):
         payload = {
             'school': settings,
             'courses': courses,
+            'birthdays': get_daily_birthday_snapshot().birthday_students,
         }
         return Response(HomepageContentSerializer(payload).data)
 

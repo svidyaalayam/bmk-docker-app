@@ -8,6 +8,29 @@ import {
 } from "../types/content";
 import type { Course, CourseClass, SecondaryLanguage } from "../types/content";
 
+const BIRTHDAY_GREETINGS: Record<string, string> = {
+  te: "జన్మదిన శుభాకాంక్షలు",
+  hi: "जन्मदिन की शुभकामनाएं",
+  ta: "பிறந்தநாள் வாழ்த்துக்கள்",
+  kn: "ಹುಟ್ಟುಹಬ್ಬದ ಶುಭಾಶಯಗಳು",
+  ml: "ജന്മദിനാശംസകൾ",
+  mr: "वाढदिवसाच्या हार्दिक शुभेच्छा",
+  gu: "જન્મદિવસની શુભેચ્છાઓ",
+  bn: "শুভ জন্মদিন",
+  pa: "ਜਨਮਦਿਨ ਦੀਆਂ ਮੁਬਾਰਕਾਂ",
+  or: "ଜନ୍ମଦିନର ଶୁଭେଚ୍ଛା",
+  sa: "जन्मदिनस्य शुभाशयाः",
+};
+
+function formatBirthdayDate(isoDate: string): string {
+  const date = new Date(`${isoDate}T00:00:00`);
+  return date.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function splitParagraphs(text: string): string[] {
   return text
     .split(/\n\s*\n/)
@@ -183,7 +206,7 @@ function CourseBlock({
 }
 
 export default function HomePage() {
-  const { loading, error, school, courses } = useSchoolContent();
+  const { loading, error, school, courses, birthdays } = useSchoolContent();
   const secondaryLanguage = school.secondary_language;
   const showSecondary =
     Boolean(secondaryLanguage) && Boolean(school.introduction_secondary.trim());
@@ -279,6 +302,43 @@ export default function HomePage() {
           </div>
         </section>
       </main>
+
+      {birthdays.length > 0 && (
+        <section className="home-section birthday-section" aria-labelledby="birthday-title">
+          <div className="home-panel">
+            <h2 id="birthday-title">Happy Birthday!</h2>
+            <p className="birthday-message">
+              We convey best birthday wishes to our amazing students celebrating
+              in this week.
+            </p>
+            {secondaryLanguage && BIRTHDAY_GREETINGS[secondaryLanguage] && (
+              <p className={`birthday-greeting ${scriptClassForLanguage(secondaryLanguage)}`}>
+                {BIRTHDAY_GREETINGS[secondaryLanguage]}
+              </p>
+            )}
+            <div className="table-wrap birthday-table-wrap">
+              <table className="birthday-table">
+                <thead>
+                  <tr>
+                    <th>Student name</th>
+                    <th>Class teacher</th>
+                    <th>Birthday</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {birthdays.map((student) => (
+                    <tr key={`${student.name}-${student.date}`}>
+                      <td><strong>{student.name}</strong></td>
+                      <td>{student.teacher}</td>
+                      <td>{formatBirthdayDate(student.date)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
 
       <footer className="site-footer">
         <p>{school.footer_text || school.school_name}</p>

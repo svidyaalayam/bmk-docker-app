@@ -4,11 +4,12 @@ import type { DashboardPayload, LoginResponse, User } from '../types/auth'
 export async function login(
   username: string,
   password: string,
+  termsAccepted: boolean,
 ): Promise<LoginResponse> {
   const body =
     username.includes('@')
-      ? { email: username.trim().toLowerCase(), password }
-      : { username: username.trim(), password }
+      ? { email: username.trim().toLowerCase(), password, terms_accepted: termsAccepted }
+      : { username: username.trim(), password, terms_accepted: termsAccepted }
   const { data } = await api.post<LoginResponse>('/api/auth/login/', body)
   return data
 }

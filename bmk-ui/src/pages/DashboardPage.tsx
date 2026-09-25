@@ -6,6 +6,7 @@ import SiteHeader from "../components/SiteHeader";
 import SikshavahiniButton from "../components/SikshavahiniButton";
 import { useSchoolContent } from "../content/SchoolContentContext";
 import type { DashboardPayload } from "../types/auth";
+import uiPackage from "../../package.json";
 import {
   adminClassesPath,
   adminCommunicationPath,
@@ -58,6 +59,11 @@ export default function DashboardPage() {
             Signed in as <strong>({user.email || "no email"})</strong>
           </p>
           <p className="role-badge">{user.role}</p>
+          {user.role === "ADMIN" && payload && (
+            <p className="app-version">
+              API v{payload.api_version || "unknown"} · UI v{uiPackage.version}
+            </p>
+          )}
 
           {error && <p className="error">{error}</p>}
 

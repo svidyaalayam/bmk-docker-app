@@ -17,6 +17,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [termsAccepted, setTermsAccepted] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -29,7 +30,7 @@ export default function LoginPage() {
     setError('')
     setSubmitting(true)
     try {
-      const loggedIn = await login(email.trim(), password)
+      const loggedIn = await login(email.trim(), password, termsAccepted)
       navigate(dashboardPathForRole(loggedIn.role), { replace: true })
     } catch (err: unknown) {
       const detail =
@@ -76,6 +77,22 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+            </label>
+            <div className="terms-box">
+              <h2>{school.terms_and_conditions.split('\n')[0] || 'Terms & Conditions'}</h2>
+              <div className="terms-content">
+                {school.terms_and_conditions.split('\n').slice(1).join('\n') ||
+                  'Please review the Terms & Conditions.'}
+              </div>
+            </div>
+            <label className="terms-acceptance">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                required
+              />
+              <span>I have read and agree to the Terms & Conditions.</span>
             </label>
             <button type="submit" disabled={submitting}>
               {submitting ? 'Signing in…' : 'Sign in'}

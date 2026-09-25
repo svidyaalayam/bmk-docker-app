@@ -8,6 +8,7 @@ interface SchoolContentValue {
   schoolSlug: string
   school: SchoolSettings
   courses: Course[]
+  birthdays: HomepageContent['birthdays']
   refresh: () => Promise<void>
 }
 
@@ -21,6 +22,7 @@ const fallbackSchool: SchoolSettings = {
   secondary_language: '',
   introduction_secondary: '',
   footer_text: '',
+  terms_and_conditions: '',
   updated_at: '',
 }
 
@@ -72,6 +74,7 @@ export function SchoolContentProvider({ children }: { children: ReactNode }) {
       schoolSlug,
       school: content?.school ?? fallbackSchool,
       courses: content?.courses ?? [],
+      birthdays: content?.birthdays ?? [],
       refresh,
     }),
     [loading, error, schoolSlug, content],

@@ -220,7 +220,7 @@ class FirebaseUserImportViewTests(TestCase):
         self.school.save(update_fields=['school_name'])
         response = self.client.post(
             '/api/auth/login/',
-            {'email': email, 'password': 'test-password'},
+            {'email': email, 'password': 'test-password', 'terms_accepted': True},
             format='json',
         )
 

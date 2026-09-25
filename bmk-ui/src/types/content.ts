@@ -36,6 +36,7 @@ export interface SchoolSettings {
   secondary_language: SecondaryLanguage
   introduction_secondary: string
   footer_text: string
+  terms_and_conditions: string
   updated_at: string
 }
 
@@ -63,6 +64,13 @@ export interface Course {
 export interface HomepageContent {
   school: SchoolSettings
   courses: Course[]
+  birthdays: BirthdayStudent[]
+}
+
+export interface BirthdayStudent {
+  name: string
+  date: string
+  teacher: string
 }
 
 export const SECONDARY_LANGUAGE_LABELS: Record<Exclude<SecondaryLanguage, ''>, string> = {

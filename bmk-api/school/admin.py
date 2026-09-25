@@ -9,6 +9,7 @@ from .models import (
     ClassSessionMaterial,
     Course,
     CourseClass,
+    DailyBirthdaySnapshot,
     SchoolSettings,
     Student,
     Teacher,
@@ -31,7 +32,21 @@ class SchoolSettingsAdmin(admin.ModelAdmin):
         ('Student account blocking', {
             'fields': ('unauthorised_absence_block_threshold',),
         }),
+        ('Sign-in terms and conditions', {
+            'fields': ('terms_and_conditions',),
+        }),
     )
+
+
+@admin.register(DailyBirthdaySnapshot)
+class DailyBirthdaySnapshotAdmin(admin.ModelAdmin):
+    list_display = ('snapshot_date', 'birthday_count', 'generated_at')
+    ordering = ('-snapshot_date',)
+    readonly_fields = ('snapshot_date', 'birthday_students', 'generated_at')
+
+    @admin.display(description='Birthday students')
+    def birthday_count(self, obj):
+        return len(obj.birthday_students or [])
 
 
 class CourseClassInline(admin.StackedInline):

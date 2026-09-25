@@ -3,7 +3,15 @@ from django.db import transaction
 from rest_framework import serializers
 
 from authentication.serializers import UserSerializer
-from .models import AdminRequest, Course, CourseClass, SchoolSettings, Student, StudentTeacherRequest, Teacher
+from .models import (
+    AdminRequest,
+    Course,
+    CourseClass,
+    SchoolSettings,
+    Student,
+    StudentTeacherRequest,
+    Teacher,
+)
 
 User = get_user_model()
 
@@ -49,6 +57,7 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'secondary_language',
             'introduction_secondary',
             'footer_text',
+            'terms_and_conditions',
             'updated_at',
         )
 
@@ -62,6 +71,7 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
 class HomepageContentSerializer(serializers.Serializer):
     school = SchoolSettingsSerializer()
     courses = CourseSerializer(many=True)
+    birthdays = serializers.ListField(child=serializers.DictField())
 
 
 class AdminRequestSerializer(serializers.ModelSerializer):

@@ -78,6 +78,11 @@ class SchoolSettings(models.Model):
         help_text='Introduction text in the selected secondary language.',
     )
     footer_text = models.TextField(blank=True, default='')
+    terms_and_conditions = models.TextField(
+        blank=True,
+        default='',
+        help_text='Terms shown on the sign-in page and accepted before login.',
+    )
     unauthorised_absence_block_threshold = models.PositiveIntegerField(
         default=3,
         validators=[MinValueValidator(1)],
@@ -91,6 +96,20 @@ class SchoolSettings(models.Model):
 
     def __str__(self):
         return f'{self.school_name} settings'
+
+
+class DailyBirthdaySnapshot(models.Model):
+    """Cached student birthdays for the school week containing a date."""
+
+    snapshot_date = models.DateField(unique=True)
+    birthday_students = models.JSONField(default=list)
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-snapshot_date']
+
+    def __str__(self):
+        return f'Birthdays for {self.snapshot_date}'
 
 
 class Course(AuditModel):

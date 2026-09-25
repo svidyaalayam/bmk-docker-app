@@ -322,6 +322,12 @@ export default function AdminUsersPage() {
       { key: 'role', header: 'Role', getValue: (u) => u.role },
       { key: 'phone', header: 'Phone', getValue: (u) => u.phone_number || '' },
       {
+        key: 'registered',
+        header: 'Date registered',
+        getValue: (u) => new Date(u.date_joined).toLocaleDateString(),
+        sortValue: (u) => u.date_joined,
+      },
+      {
         key: 'actions',
         header: '',
         sortable: false,
