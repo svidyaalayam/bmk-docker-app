@@ -5,6 +5,8 @@ from rest_framework import serializers
 from authentication.serializers import UserSerializer
 from .models import (
     AdminRequest,
+    AcademicCalendarEntry,
+    Announcement,
     Course,
     CourseClass,
     SchoolSettings,
@@ -40,6 +42,45 @@ class CourseSerializer(serializers.ModelSerializer):
         fields = ('id', 'title', 'summary', 'display_order', 'display_language', 'classes')
 
 
+class AcademicCalendarEntrySerializer(serializers.ModelSerializer):
+    term_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AcademicCalendarEntry
+        fields = (
+            'id',
+            'term_name',
+            'entry_type',
+            'title',
+            'start_date',
+            'end_date',
+            'notes',
+        )
+
+    def get_term_name(self, obj):
+        return obj.term.name if obj.term_id else 'Other dates'
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Announcement
+        fields = (
+            'id',
+            'title',
+            'message',
+            'image_url',
+            'start_date',
+            'end_date',
+        )
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        return obj.image.url
+
+
 class SchoolSettingsSerializer(serializers.ModelSerializer):
     school_id = serializers.IntegerField(source='id', read_only=True)
     logo_url = serializers.SerializerMethodField()
@@ -71,6 +112,8 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
 class HomepageContentSerializer(serializers.Serializer):
     school = SchoolSettingsSerializer()
     courses = CourseSerializer(many=True)
+    academic_calendar = AcademicCalendarEntrySerializer(many=True)
+    announcements = AnnouncementSerializer(many=True)
     birthdays = serializers.ListField(child=serializers.DictField())
 
 

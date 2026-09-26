@@ -794,6 +794,124 @@ html[data-language="sa"] .platform-highlight {
   padding-top: 0;
 }
 
+.calendar-section,
+.announcements-section,
+.birthday-section {
+  padding-top: 0;
+}
+
+.calendar-section .home-panel {
+  text-align: left;
+}
+
+.calendar-section h2 {
+  margin: 0;
+  color: var(--accent-dark);
+}
+
+.calendar-intro {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.calendar-table-wrap {
+  margin-top: 16px;
+}
+
+.calendar-table {
+  min-width: 620px;
+}
+
+.calendar-groups {
+  display: grid;
+  gap: 22px;
+  margin-top: 18px;
+}
+
+.term-calendar-group h3 {
+  margin: 0;
+  color: var(--accent-dark);
+}
+
+.term-calendar-group .calendar-table-wrap {
+  margin-top: 8px;
+}
+
+.calendar-entry-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.calendar-entry-pill.week {
+  background: #d9f5e4;
+  color: #146c43;
+}
+
+.calendar-entry-pill.exam_week {
+  background: #e4e7ff;
+  color: #38448a;
+}
+
+.calendar-entry-pill.holiday {
+  background: #fff0d9;
+  color: #8a4b00;
+}
+
+.calendar-notes {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+.announcements-section .home-panel {
+  text-align: left;
+}
+
+.announcements-section h2 {
+  margin: 0;
+  color: var(--accent-dark);
+}
+
+.announcement-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.announcement-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 36%);
+  gap: 20px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid #c6ddd2;
+  border-radius: 14px;
+  background: #f7fbf8;
+}
+
+.announcement-card h3 {
+  margin: 0 0 8px;
+  color: var(--accent-dark);
+}
+
+.announcement-message {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.announcement-image {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
 .birthday-section .home-panel {
   text-align: center;
 }
@@ -1972,6 +2090,10 @@ th {
   }
 
   .home-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .announcement-card {
     grid-template-columns: 1fr;
   }
 

@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.core.validators import MinValueValidator
 
@@ -110,6 +111,92 @@ class DailyBirthdaySnapshot(models.Model):
 
     def __str__(self):
         return f'Birthdays for {self.snapshot_date}'
+
+
+class Announcement(AuditModel):
+    """An optional, date-windowed notice shown on the public homepage."""
+
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    image = models.ImageField(
+        upload_to='announcements/%Y/%m/',
+        blank=True,
+        null=True,
+        storage=select_homework_storage,
+        help_text='Optional poster, calendar, flyer, or other visual notice.',
+    )
+    start_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Optional. The notice is shown from this date.',
+    )
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Optional. The notice is shown through this date.',
+    )
+    display_order = models.PositiveIntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', '-created_at', 'id']
+
+    def clean(self):
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError('End date cannot be before start date.')
+        if not self.message.strip() and not self.image:
+            raise ValidationError('Add a message or an image to the announcement.')
+
+    def __str__(self):
+        return self.title
+
+
+class AcademicCalendarEntry(AuditModel):
+    class EntryType(models.TextChoices):
+        WEEK = 'WEEK', 'Teaching week'
+        EXAM_WEEK = 'EXAM_WEEK', 'Exam week'
+        HOLIDAY = 'HOLIDAY', 'Holiday'
+
+    term = models.ForeignKey(
+        'AcademicTerm',
+        on_delete=models.CASCADE,
+        related_name='calendar_entries',
+        null=True,
+        blank=True,
+    )
+    entry_type = models.CharField(max_length=12, choices=EntryType.choices)
+    title = models.CharField(max_length=200)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    display_order = models.PositiveIntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'start_date', 'title', 'id']
+
+    def clean(self):
+        if self.entry_type != self.EntryType.HOLIDAY and (
+            self.start_date is None or self.end_date is None
+        ):
+            raise ValidationError('Teaching and exam weeks require start and end dates.')
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError('End date cannot be before start date.')
+
+    def __str__(self):
+        return f'{self.title} ({self.start_date} - {self.end_date})'
+
+
+class AcademicTerm(AuditModel):
+    name = models.CharField(max_length=200)
+    display_order = models.PositiveIntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return self.name
 
 
 class Course(AuditModel):

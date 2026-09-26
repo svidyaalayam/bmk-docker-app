@@ -16,7 +16,17 @@ from authentication.permissions import IsAdminRole
 from authentication.serializers import UserSerializer
 from authentication.usernames import username_for_school_email
 from .birthday_snapshots import get_daily_birthday_snapshot
-from .models import AdminRequest, Course, CourseClass, Student, StudentTeacherRequest, Teacher, TeachingClass
+from .models import (
+    AcademicCalendarEntry,
+    AdminRequest,
+    Announcement,
+    Course,
+    CourseClass,
+    Student,
+    StudentTeacherRequest,
+    Teacher,
+    TeachingClass,
+)
 from .serializers import (
     HomepageContentSerializer,
     SchoolSettingsSerializer,
@@ -46,9 +56,25 @@ class HomepageContentView(APIView):
                 queryset=CourseClass.objects.filter(is_published=True, is_active=True),
             )
         )
+        academic_calendar = AcademicCalendarEntry.objects.filter(
+            is_published=True,
+            is_active=True,
+        ).filter(
+            Q(term__isnull=True) | Q(term__is_published=True),
+        ).select_related('term')
+        today = timezone.localdate()
+        announcements = Announcement.objects.filter(
+            is_published=True,
+            is_active=True,
+        ).filter(
+            Q(start_date__isnull=True) | Q(start_date__lte=today),
+            Q(end_date__isnull=True) | Q(end_date__gte=today),
+        )
         payload = {
             'school': settings,
             'courses': courses,
+            'academic_calendar': academic_calendar,
+            'announcements': announcements,
             'birthdays': get_daily_birthday_snapshot().birthday_students,
         }
         return Response(HomepageContentSerializer(payload).data)

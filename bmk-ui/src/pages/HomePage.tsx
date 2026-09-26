@@ -31,6 +31,21 @@ function formatBirthdayDate(isoDate: string): string {
   });
 }
 
+function formatCalendarDate(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatCalendarRange(startDate: string | null, endDate: string | null): string {
+  if (!startDate || !endDate) return ""
+  const start = formatCalendarDate(startDate);
+  const end = formatCalendarDate(endDate);
+  return start === end ? start : `${start} – ${end}`;
+}
+
 function splitParagraphs(text: string): string[] {
   return text
     .split(/\n\s*\n/)
@@ -206,10 +221,26 @@ function CourseBlock({
 }
 
 export default function HomePage() {
-  const { loading, error, school, courses, birthdays } = useSchoolContent();
+  const {
+    loading,
+    error,
+    school,
+    courses,
+    academicCalendar,
+    announcements,
+    birthdays,
+  } = useSchoolContent();
   const secondaryLanguage = school.secondary_language;
   const showSecondary =
     Boolean(secondaryLanguage) && Boolean(school.introduction_secondary.trim());
+  const calendarGroups = academicCalendar.reduce<Record<string, typeof academicCalendar>>(
+    (groups, entry) => {
+      if (!groups[entry.term_name]) groups[entry.term_name] = []
+      groups[entry.term_name].push(entry)
+      return groups
+    },
+    {},
+  )
 
   useEffect(() => {
     if (school.school_name) {
@@ -302,6 +333,83 @@ export default function HomePage() {
           </div>
         </section>
       </main>
+
+      {academicCalendar.length > 0 && (
+        <section className="home-section calendar-section" aria-labelledby="calendar-title">
+          <div className="home-panel">
+            <h2 id="calendar-title">Term dates and holidays</h2>
+            <p className="calendar-intro">
+              Classes are generally held on Saturdays and Sundays. Please check
+              the dates below for teaching periods and holidays.
+            </p>
+            <div className="calendar-groups">
+              {Object.entries(calendarGroups).map(([termName, entries]) => (
+                <div className="term-calendar-group" key={termName}>
+                  <h3>{termName}</h3>
+                  <div className="table-wrap calendar-table-wrap">
+                    <table className="calendar-table">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Dates</th>
+                          <th>Details</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entries.map((entry) => (
+                          <tr key={entry.id}>
+                            <td>
+                              <span className={`calendar-entry-pill ${entry.entry_type.toLowerCase()}`}>
+                                {entry.entry_type === "WEEK"
+                                  ? "Teaching week"
+                                  : entry.entry_type === "EXAM_WEEK"
+                                    ? "Exam week"
+                                    : "Holiday"}
+                              </span>
+                            </td>
+                            <td>{formatCalendarRange(entry.start_date, entry.end_date)}</td>
+                            <td>
+                              <strong>{entry.title}</strong>
+                              {entry.notes && <span className="calendar-notes">{entry.notes}</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {announcements.length > 0 && (
+        <section className="home-section announcements-section" aria-labelledby="announcements-title">
+          <div className="home-panel">
+            <h2 id="announcements-title">Announcements</h2>
+            <div className="announcement-list">
+              {announcements.map((announcement) => (
+                <article className="announcement-card" key={announcement.id}>
+                  <div className="announcement-content">
+                    <h3>{announcement.title}</h3>
+                    {announcement.message && (
+                      <p className="announcement-message">{announcement.message}</p>
+                    )}
+                  </div>
+                  {announcement.image_url && (
+                    <img
+                      className="announcement-image"
+                      src={announcement.image_url}
+                      alt={announcement.title}
+                    />
+                  )}
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {birthdays.length > 0 && (
         <section className="home-section birthday-section" aria-labelledby="birthday-title">

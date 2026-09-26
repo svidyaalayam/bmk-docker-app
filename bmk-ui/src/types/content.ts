@@ -64,7 +64,28 @@ export interface Course {
 export interface HomepageContent {
   school: SchoolSettings
   courses: Course[]
+  academic_calendar: AcademicCalendarEntry[]
+  announcements: Announcement[]
   birthdays: BirthdayStudent[]
+}
+
+export interface Announcement {
+  id: number
+  title: string
+  message: string
+  image_url: string | null
+  start_date: string | null
+  end_date: string | null
+}
+
+export interface AcademicCalendarEntry {
+  id: number
+  term_name: string
+  entry_type: 'WEEK' | 'EXAM_WEEK' | 'HOLIDAY'
+  title: string
+  start_date: string | null
+  end_date: string | null
+  notes: string
 }
 
 export interface BirthdayStudent {

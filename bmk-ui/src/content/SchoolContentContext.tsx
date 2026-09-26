@@ -8,6 +8,8 @@ interface SchoolContentValue {
   schoolSlug: string
   school: SchoolSettings
   courses: Course[]
+  academicCalendar: HomepageContent['academic_calendar']
+  announcements: HomepageContent['announcements']
   birthdays: HomepageContent['birthdays']
   refresh: () => Promise<void>
 }
@@ -74,6 +76,8 @@ export function SchoolContentProvider({ children }: { children: ReactNode }) {
       schoolSlug,
       school: content?.school ?? fallbackSchool,
       courses: content?.courses ?? [],
+      academicCalendar: content?.academic_calendar ?? [],
+      announcements: content?.announcements ?? [],
       birthdays: content?.birthdays ?? [],
       refresh,
     }),

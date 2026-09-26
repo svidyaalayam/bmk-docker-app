@@ -1,6 +1,9 @@
 from django.contrib import admin
 
 from .models import (
+    AcademicCalendarEntry,
+    AcademicTerm,
+    Announcement,
     ClassMembership,
     ClassSession,
     ClassSessionAttendance,
@@ -47,6 +50,46 @@ class DailyBirthdaySnapshotAdmin(admin.ModelAdmin):
     @admin.display(description='Birthday students')
     def birthday_count(self, obj):
         return len(obj.birthday_students or [])
+
+
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = ('title', 'start_date', 'end_date', 'is_published', 'display_order')
+    list_filter = ('is_published',)
+    search_fields = ('title', 'message')
+    ordering = ('display_order', '-created_at', 'id')
+    fieldsets = (
+        ('Announcement', {
+            'fields': ('title', 'message', 'image'),
+        }),
+        ('Visibility', {
+            'fields': ('start_date', 'end_date', 'is_published', 'display_order'),
+        }),
+    )
+
+
+@admin.register(AcademicCalendarEntry)
+class AcademicCalendarEntryAdmin(admin.ModelAdmin):
+    list_display = ('title', 'term', 'entry_type', 'start_date', 'end_date', 'is_published', 'display_order')
+    list_filter = ('entry_type', 'is_published')
+    search_fields = ('title', 'notes', 'term__name')
+    ordering = ('display_order', 'start_date', 'title', 'id')
+    fieldsets = (
+        ('Calendar entry', {
+            'fields': ('term', 'entry_type', 'title', 'start_date', 'end_date', 'notes'),
+        }),
+        ('Homepage display', {
+            'fields': ('is_published', 'display_order'),
+        }),
+    )
+
+
+@admin.register(AcademicTerm)
+class AcademicTermAdmin(admin.ModelAdmin):
+    list_display = ('name', 'is_published', 'display_order')
+    list_filter = ('is_published',)
+    search_fields = ('name',)
+    ordering = ('display_order', 'name')
 
 
 class CourseClassInline(admin.StackedInline):
