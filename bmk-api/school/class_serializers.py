@@ -67,6 +67,7 @@ class ClassSessionSerializer(serializers.ModelSerializer):
             'session_date',
             'classwork',
             'homework',
+            'homework_due_date',
             'is_started',
             'started_at',
             'present_count',
@@ -133,7 +134,7 @@ class ClassSessionSerializer(serializers.ModelSerializer):
 class ClassSessionWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClassSession
-        fields = ('session_date', 'classwork', 'homework')
+        fields = ('session_date', 'classwork', 'homework', 'homework_due_date')
 
     def validate_session_date(self, value):
         teaching_class = self.context['teaching_class']

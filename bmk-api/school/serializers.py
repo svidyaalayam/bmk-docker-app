@@ -139,6 +139,39 @@ class StudentTeacherRequestSerializer(serializers.ModelSerializer):
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     class_assignment_count = serializers.IntegerField(read_only=True, default=0)
+    class_attendance_summary = serializers.SerializerMethodField()
+
+    def get_class_attendance_summary(self, obj):
+        """Return attendance by current active class for the admin student view."""
+        memberships = getattr(obj, 'admin_active_class_memberships', None)
+        if memberships is None:
+            memberships = obj.class_memberships.filter(
+                teaching_class__is_active=True,
+            ).select_related('teaching_class')
+
+        attendance_records = getattr(obj, 'admin_started_session_attendance', None)
+        if attendance_records is None:
+            attendance_records = obj.session_attendance.filter(
+                session__is_started=True,
+            ).select_related('session__teaching_class')
+
+        records_by_class = {}
+        for record in attendance_records:
+            records_by_class.setdefault(record.session.teaching_class_id, []).append(record)
+
+        summary = []
+        for membership in memberships:
+            records = records_by_class.get(membership.teaching_class_id, [])
+            total = len(records)
+            present = sum(record.status == 'PRESENT' for record in records)
+            summary.append({
+                'class_id': membership.teaching_class_id,
+                'class_name': membership.teaching_class.name,
+                'present_classes': present,
+                'total_classes': total,
+                'attendance_percent': round((present / total) * 100, 1) if total else None,
+            })
+        return summary
 
     class Meta:
         model = Student
@@ -158,6 +191,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'class_assignment_count',
+            'class_attendance_summary',
         )
         read_only_fields = ('id', 'user', 'is_active', 'created_at', 'updated_at')
 

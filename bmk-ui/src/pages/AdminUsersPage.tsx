@@ -10,10 +10,12 @@ import {
 } from '../api/school'
 import type { UserImportDuplicate, UserImportResult } from '../api/school'
 import { activateUser, listPendingUsers } from '../api/auth'
+import { addClassStudents, listClasses, removeClassStudent } from '../api/classes'
 import DataTable, { type DataTableColumn } from '../components/DataTable'
 import SiteHeader from '../components/SiteHeader'
 import type { User } from '../types/auth'
 import type { Gender, StudentProfile, TeacherProfile } from '../types/school'
+import type { TeachingClassListItem } from '../types/classes'
 import { getErrorMessage } from '../utils/errors'
 
 type EditTarget =
@@ -715,6 +717,12 @@ export default function AdminUsersPage() {
                 setSubmitting(false)
               }
             }}
+            onClassMembershipChanged={async () => {
+              const updatedStudents = await listStudents()
+              setStudents(updatedStudents)
+              const updatedStudent = updatedStudents.find((student) => student.id === editing.profile.id)
+              if (updatedStudent) setEditing({ kind: 'student', profile: updatedStudent })
+            }}
           />
         )}
       </div>
@@ -823,6 +831,7 @@ function PendingUserDetailsModal({
                     Notes
                     <textarea value={student.notes || ''} disabled readOnly rows={2} />
                   </label>
+                  <StudentClassAttendanceTable student={student} />
                 </>
               )}
             </div>
@@ -844,16 +853,81 @@ function PendingUserDetailsModal({
   )
 }
 
+function StudentClassAttendanceTable({
+  student,
+  onAddClass,
+  onRemoveClass,
+  busyClassId,
+}: {
+  student: StudentProfile
+  onAddClass?: () => void
+  onRemoveClass?: (classId: number, className: string) => void
+  busyClassId?: number | null
+}) {
+  const assignments = student.class_attendance_summary || []
+
+  return (
+    <div className="full student-summary-table-wrap">
+      <h4>Assigned classes ({student.class_assignment_count})</h4>
+      {onAddClass && (
+        <p>
+          <button type="button" className="home-btn secondary" onClick={onAddClass}>
+            Add to a class
+          </button>
+        </p>
+      )}
+      <table className="student-summary-table">
+        <thead>
+          <tr>
+            <th>Class</th>
+            <th>Present / total</th>
+            <th>Attendance</th>
+            {onRemoveClass && <th aria-label="Class actions" />}
+          </tr>
+        </thead>
+        <tbody>
+          {assignments.map((item) => (
+            <tr key={item.class_id}>
+              <td>{item.class_name}</td>
+              <td>{item.present_classes}/{item.total_classes}</td>
+              <td>{item.attendance_percent === null ? 'No attendance recorded' : `${item.attendance_percent}%`}</td>
+              {onRemoveClass && (
+                <td>
+                  <button
+                    type="button"
+                    className="tab danger"
+                    onClick={() => onRemoveClass(item.class_id, item.class_name)}
+                    disabled={busyClassId === item.class_id}
+                  >
+                    {busyClassId === item.class_id ? 'Removing…' : 'Remove'}
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+          {assignments.length === 0 && (
+            <tr>
+              <td colSpan={onRemoveClass ? 4 : 3}>This student is not assigned to an active class.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function EditUserModal({
   target,
   submitting,
   onClose,
   onSave,
+  onClassMembershipChanged,
 }: {
   target: Exclude<EditTarget, null>
   submitting: boolean
   onClose: () => void
   onSave: (payload: Record<string, unknown>) => Promise<void>
+  onClassMembershipChanged: () => Promise<void>
 }) {
   const profile = target.profile
   const user = profile.user
@@ -883,6 +957,11 @@ function EditUserModal({
     target.kind === 'student' ? target.profile.address || '' : '',
   )
   const [notes, setNotes] = useState(target.kind === 'student' ? target.profile.notes || '' : '')
+  const [availableClasses, setAvailableClasses] = useState<TeachingClassListItem[]>([])
+  const [showAddClass, setShowAddClass] = useState(false)
+  const [selectedClassId, setSelectedClassId] = useState('')
+  const [classActionBusy, setClassActionBusy] = useState<number | null>(null)
+  const [classActionError, setClassActionError] = useState('')
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -905,6 +984,65 @@ function EditUserModal({
       payload.block_reason = accountBlocked ? blockReason : ''
     }
     await onSave(payload)
+  }
+
+  const openAddClass = async () => {
+    if (target.kind !== 'student') return
+    setClassActionError('')
+    try {
+      const classes = await listClasses()
+      const assignedIds = new Set(target.profile.class_attendance_summary.map((item) => item.class_id))
+      setAvailableClasses(classes.filter((teachingClass) => teachingClass.is_active && !assignedIds.has(teachingClass.id)))
+      setSelectedClassId('')
+      setShowAddClass(true)
+    } catch (err) {
+      setClassActionError(getErrorMessage(err, 'Could not load available classes.'))
+    }
+  }
+
+  const addStudentToClass = async () => {
+    if (target.kind !== 'student' || !selectedClassId) return
+    const classId = Number(selectedClassId)
+    const selectedClass = availableClasses.find((teachingClass) => teachingClass.id === classId)
+    if (!selectedClass) return
+
+    const studentName = fullName(target.profile.user.first_name, target.profile.user.last_name)
+      || target.profile.user.username
+    const confirmed = window.confirm(
+      `There ${selectedClass.student_count === 1 ? 'is' : 'are'} already ${selectedClass.student_count} ${selectedClass.student_count === 1 ? 'student' : 'students'} assigned to ${selectedClass.name}. Do you still want to add ${studentName}?`,
+    )
+    if (!confirmed) return
+
+    setClassActionBusy(classId)
+    setClassActionError('')
+    try {
+      await addClassStudents(classId, [target.profile.id])
+      await onClassMembershipChanged()
+      setShowAddClass(false)
+    } catch (err) {
+      setClassActionError(getErrorMessage(err, 'Could not add the student to this class.'))
+    } finally {
+      setClassActionBusy(null)
+    }
+  }
+
+  const removeStudentFromClass = async (classId: number, className: string) => {
+    if (target.kind !== 'student') return
+    const confirmed = window.confirm(
+      `Remove ${fullName(target.profile.user.first_name, target.profile.user.last_name) || target.profile.user.username} from ${className}? Their class membership will be removed.`,
+    )
+    if (!confirmed) return
+
+    setClassActionBusy(classId)
+    setClassActionError('')
+    try {
+      await removeClassStudent(classId, target.profile.id)
+      await onClassMembershipChanged()
+    } catch (err) {
+      setClassActionError(getErrorMessage(err, 'Could not remove the student from this class.'))
+    } finally {
+      setClassActionBusy(null)
+    }
   }
 
   return (
@@ -967,52 +1105,87 @@ function EditUserModal({
           </div>
 
           {target.kind === 'student' && (
-            <div className="form-grid">
-              <label>
-                Date of birth
-                <input
-                  type="date"
-                  value={dateOfBirth}
-                  onChange={(e) => setDateOfBirth(e.target.value)}
-                />
-              </label>
-              <label>
-                Parent name
-                <input value={parentName} onChange={(e) => setParentName(e.target.value)} />
-              </label>
-              <label>
-                Parent phone
-                <input value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} />
-              </label>
-              <label className="full">
-                Address
-                <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} />
-              </label>
-              <label className="full">
-                Notes
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-              </label>
-              <label>
-                Account blocked
-                <select
-                  value={accountBlocked ? 'yes' : 'no'}
-                  onChange={(e) => setAccountBlocked(e.target.value === 'yes')}
-                >
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
-              </label>
-              <label className="full">
-                Reason for blocking
-                <textarea
-                  value={blockReason}
-                  onChange={(e) => setBlockReason(e.target.value)}
-                  rows={2}
-                  disabled={!accountBlocked}
-                  placeholder="Explain why this student account is blocked"
-                />
-              </label>
-            </div>
+            <>
+              <div className="form-grid">
+                <label>
+                  Date of birth
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Parent name
+                  <input value={parentName} onChange={(e) => setParentName(e.target.value)} />
+                </label>
+                <label>
+                  Parent phone
+                  <input value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} />
+                </label>
+                <label className="full">
+                  Address
+                  <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} />
+                </label>
+                <label className="full">
+                  Notes
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+                </label>
+                <label>
+                  Account blocked
+                  <select
+                    value={accountBlocked ? 'yes' : 'no'}
+                    onChange={(e) => setAccountBlocked(e.target.value === 'yes')}
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </label>
+                <label className="full">
+                  Reason for blocking
+                  <textarea
+                    value={blockReason}
+                    onChange={(e) => setBlockReason(e.target.value)}
+                    rows={2}
+                    disabled={!accountBlocked}
+                    placeholder="Explain why this student account is blocked"
+                  />
+                </label>
+              </div>
+              <StudentClassAttendanceTable
+                student={target.profile}
+                onAddClass={openAddClass}
+                onRemoveClass={removeStudentFromClass}
+                busyClassId={classActionBusy}
+              />
+              {classActionError && <p className="form-error">{classActionError}</p>}
+              {showAddClass && (
+                <div className="form-grid student-class-add">
+                  <label>
+                    Add to class
+                    <select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>
+                      <option value="">Select a class</option>
+                      {availableClasses.map((teachingClass) => (
+                        <option key={teachingClass.id} value={teachingClass.id}>{teachingClass.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      onClick={addStudentToClass}
+                      disabled={!selectedClassId || classActionBusy !== null}
+                    >
+                      {classActionBusy !== null ? 'Adding…' : 'Add student'}
+                    </button>
+                    <button type="button" className="tab" onClick={() => setShowAddClass(false)} disabled={classActionBusy !== null}>
+                      Cancel
+                    </button>
+                  </div>
+                  {availableClasses.length === 0 && <p className="header-sub">No other active classes are available.</p>}
+                </div>
+              )}
+            </>
           )}
 
           <div className="form-actions">

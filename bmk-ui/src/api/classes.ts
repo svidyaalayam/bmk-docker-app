@@ -48,6 +48,18 @@ export async function removeClassStudent(classId: number, studentId: number): Pr
   await api.delete(`/api/classes/${classId}/students/${studentId}/`)
 }
 
+export async function sendClassEmail(
+  classId: number,
+  teacherIds: number[],
+  studentIds: number[],
+): Promise<{ sent_count: number; skipped_no_email: Array<{ role: string; id: number }> }> {
+  const { data } = await api.post(`/api/classes/${classId}/email/`, {
+    teacher_ids: teacherIds,
+    student_ids: studentIds,
+  })
+  return data
+}
+
 export async function blockClassStudent(
   classId: number,
   studentId: number,
@@ -67,7 +79,7 @@ export async function listSessions(classId: number): Promise<ClassSession[]> {
 
 export async function createSession(
   classId: number,
-  payload: { session_date: string; classwork?: string; homework?: string },
+  payload: { session_date: string; classwork?: string; homework?: string; homework_due_date?: string | null },
 ): Promise<ClassSession> {
   const { data } = await api.post<ClassSession>(`/api/classes/${classId}/sessions/`, payload)
   return data
@@ -83,7 +95,7 @@ export async function importCalendarDates(
 
 export async function updateSession(
   sessionId: number,
-  payload: { session_date?: string; classwork?: string; homework?: string },
+  payload: { session_date?: string; classwork?: string; homework?: string; homework_due_date?: string | null },
 ): Promise<ClassSession> {
   const { data } = await api.patch<ClassSession>(`/api/sessions/${sessionId}/`, payload)
   return data
@@ -95,6 +107,14 @@ export async function deleteSession(sessionId: number): Promise<void> {
 
 export async function startSession(sessionId: number): Promise<ClassSession> {
   const { data } = await api.post<ClassSession>(`/api/sessions/${sessionId}/start/`)
+  return data
+}
+
+export async function sendSessionEmail(sessionId: number): Promise<{
+  skipped_no_email_student_ids: number[]
+  teacher_copy_sent: boolean
+}> {
+  const { data } = await api.post(`/api/sessions/${sessionId}/email/`)
   return data
 }
 
@@ -170,6 +190,15 @@ export async function uploadHomework(sessionId: number, file: File): Promise<Hom
     `/api/sessions/${sessionId}/homework/`,
     form,
   )
+  return data
+}
+
+export async function sendHomeworkSubmissionEmail(sessionId: number): Promise<{
+  teacher_email_sent: boolean
+  student_copy_sent: boolean
+  homework_submitted: boolean
+}> {
+  const { data } = await api.post(`/api/sessions/${sessionId}/homework/email/`)
   return data
 }
 

@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.core.mail import send_mass_mail
 from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -359,6 +361,105 @@ class TeachingClassStudentRemoveView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class TeachingClassEmailView(APIView):
+    """Send a class update to selected current teachers and students."""
+
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            teaching_class = TeachingClass.objects.select_related(
+                'teacher_1__user',
+                'teacher_2__user',
+            ).prefetch_related(
+                Prefetch(
+                    'memberships',
+                    queryset=ClassMembership.objects.select_related('student__user'),
+                ),
+            ).get(pk=pk)
+        except TeachingClass.DoesNotExist:
+            return Response({'detail': 'Not found.'}, status=404)
+
+        teacher_ids = request.data.get('teacher_ids', [])
+        student_ids = request.data.get('student_ids', [])
+        if not isinstance(teacher_ids, list) or not isinstance(student_ids, list):
+            return Response(
+                {'detail': 'teacher_ids and student_ids must both be lists.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            teacher_ids = {int(value) for value in teacher_ids}
+            student_ids = {int(value) for value in student_ids}
+        except (TypeError, ValueError):
+            return Response({'detail': 'Recipient ids must be integers.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        class_teachers = [teacher for teacher in (teaching_class.teacher_1, teaching_class.teacher_2) if teacher]
+        class_teacher_ids = {teacher.id for teacher in class_teachers}
+        class_students = [membership.student for membership in teaching_class.memberships.all()]
+        class_student_ids = {student.id for student in class_students}
+        if not teacher_ids.issubset(class_teacher_ids) or not student_ids.issubset(class_student_ids):
+            return Response(
+                {'detail': 'Recipients must be current teachers or students of this class.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not teacher_ids and not student_ids:
+            return Response({'detail': 'Select at least one recipient.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        teacher_names = ', '.join(
+            f'{teacher.user.first_name} {teacher.user.last_name}'.strip() or teacher.user.username
+            for teacher in class_teachers
+        )
+        student_list = '\n'.join(
+            f'- {f"{student.user.first_name} {student.user.last_name}".strip() or student.user.username}'
+            for student in sorted(class_students, key=lambda item: (item.user.last_name, item.user.first_name, item.user.username))
+        ) or '- No students currently assigned'
+        description = teaching_class.description.strip() or 'No class description has been provided.'
+        subject = f'Class update: {teaching_class.name}'
+        messages = []
+        skipped_no_email = []
+
+        for teacher in class_teachers:
+            if teacher.id not in teacher_ids:
+                continue
+            if not teacher.user.email:
+                skipped_no_email.append({'role': 'teacher', 'id': teacher.id})
+                continue
+            teacher_name = f'{teacher.user.first_name} {teacher.user.last_name}'.strip() or teacher.user.username
+            messages.append((
+                subject,
+                f'Hello {teacher_name},\n\n'
+                f'Class: {teaching_class.name}\n\n'
+                f'Class description:\n{description}\n\n'
+                f'Current students:\n{student_list}\n',
+                settings.DEFAULT_FROM_EMAIL,
+                [teacher.user.email],
+            ))
+
+        students_by_id = {student.id: student for student in class_students}
+        for student_id in student_ids:
+            student = students_by_id[student_id]
+            if not student.user.email:
+                skipped_no_email.append({'role': 'student', 'id': student.id})
+                continue
+            student_name = f'{student.user.first_name} {student.user.last_name}'.strip() or student.user.username
+            messages.append((
+                subject,
+                f'Hello {student_name},\n\n'
+                f'Class: {teaching_class.name}\n'
+                f'Teacher{"s" if len(class_teachers) != 1 else ""}: {teacher_names or "Not assigned"}\n\n'
+                f'Class description:\n{description}\n',
+                settings.DEFAULT_FROM_EMAIL,
+                [student.user.email],
+            ))
+
+        sent_count = send_mass_mail(messages, fail_silently=False) if messages else 0
+        return Response({
+            'sent_count': sent_count,
+            'skipped_no_email': skipped_no_email,
+        })
+
+
 class ClassSessionListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -575,6 +676,116 @@ class ClassSessionStartView(APIView):
         ]
         ClassSessionAttendance.objects.bulk_create(to_create)
         return Response(ClassSessionSerializer(session).data)
+
+
+class ClassSessionEmailView(APIView):
+    """Teacher sends the started session's classwork and homework details to students."""
+
+    permission_classes = [IsTeacherRole]
+
+    def post(self, request, pk):
+        try:
+            session = ClassSession.objects.select_related(
+                'teaching_class__teacher_1__user',
+                'teaching_class__teacher_2__user',
+            ).prefetch_related(
+                Prefetch(
+                    'attendance_records',
+                    queryset=ClassSessionAttendance.objects.select_related('student__user'),
+                ),
+                'materials',
+            ).get(pk=pk)
+        except ClassSession.DoesNotExist:
+            return Response({'detail': 'Not found.'}, status=404)
+
+        if not _user_can_manage_class(request.user, session.teaching_class):
+            return Response({'detail': 'Not allowed.'}, status=403)
+        if not session.is_started:
+            return Response(
+                {'detail': 'Start the class before sending its attendance email.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        def material_details(kind):
+            files = [material for material in session.materials.all() if material.kind == kind]
+            if not files:
+                return 'No attachments.'
+            details = []
+            for material in files:
+                filename = material.original_filename or 'Attachment'
+                url = material.file.url if material.file else ''
+                if url and not url.startswith(('http://', 'https://')):
+                    url = request.build_absolute_uri(url)
+                details.append(f'- {filename}{f": {url}" if url else ""}')
+            return '\n'.join(details)
+
+        teacher_name = (
+            f'{request.user.first_name} {request.user.last_name}'.strip()
+            or request.user.username
+        )
+        date_label = session.session_date.strftime('%d %B %Y')
+        due_date = (
+            session.homework_due_date.strftime('%d %B %Y')
+            if session.homework_due_date
+            else 'No target date has been set.'
+        )
+        classwork_details = session.classwork.strip() or 'No classwork details were provided.'
+        homework_details = session.homework.strip() or 'No homework details were provided.'
+        classwork_files = material_details(ClassSessionMaterial.Kind.CLASSWORK)
+        homework_files = material_details(ClassSessionMaterial.Kind.HOMEWORK)
+        subject = f'Classwork and homework details: {session.teaching_class.name} — {date_label}'
+        messages = []
+        skipped_no_email = []
+        emailed_student_names = []
+
+        for attendance in session.attendance_records.all():
+            student = attendance.student
+            if not student.user.email:
+                skipped_no_email.append(student.id)
+                continue
+            student_name = (
+                f'{student.user.first_name} {student.user.last_name}'.strip()
+                or student.user.username
+            )
+            emailed_student_names.append(student_name)
+            messages.append((
+                subject,
+                f'Dear {student_name},\n\n'
+                f'You are marked as {attendance.get_status_display()} for {session.teaching_class.name} on {date_label}.\n\n'
+                f'The classwork details are as follows:\n{classwork_details}\n\n'
+                f'Classwork attachments:\n{classwork_files}\n\n'
+                f'The homework details are as follows:\n{homework_details}\n\n'
+                f'Homework attachments:\n{homework_files}\n\n'
+                f'Please complete the homework by: {due_date}\n\n'
+                f'With best regards,\n{teacher_name}\n',
+                settings.DEFAULT_FROM_EMAIL,
+                [student.user.email],
+            ))
+
+        teacher_copy_sent = False
+        if request.user.email:
+            recipients = '\n'.join(f'- {name}' for name in emailed_student_names) or '- No students had an email address available.'
+            messages.append((
+                f'Class email sent: {session.teaching_class.name} — {date_label}',
+                f'Hello {teacher_name},\n\n'
+                f'The classwork and homework details for {session.teaching_class.name} on {date_label} '
+                f'were sent to the following students:\n{recipients}\n\n'
+                f'Classwork details:\n{classwork_details}\n\n'
+                f'Classwork attachments:\n{classwork_files}\n\n'
+                f'Homework details:\n{homework_details}\n\n'
+                f'Homework attachments:\n{homework_files}\n\n'
+                f'Homework target date: {due_date}\n\n'
+                f'With best regards,\nBalamukundam Vidyalayam\n',
+                settings.DEFAULT_FROM_EMAIL,
+                [request.user.email],
+            ))
+            teacher_copy_sent = True
+
+        send_mass_mail(messages, fail_silently=False) if messages else 0
+        return Response({
+            'skipped_no_email_student_ids': skipped_no_email,
+            'teacher_copy_sent': teacher_copy_sent,
+        })
 
 
 class SessionAttendanceListView(APIView):
@@ -833,6 +1044,109 @@ class SessionHomeworkListCreateView(APIView):
             ClassSessionHomeworkSerializer(hw, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class SessionHomeworkEmailView(APIView):
+    """Student sends their session homework submission links to the class teachers."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        if not _is_student(request.user):
+            return Response({'detail': 'Only students can send homework submission emails.'}, status=403)
+
+        try:
+            session = ClassSession.objects.select_related(
+                'teaching_class__teacher_1__user',
+                'teaching_class__teacher_2__user',
+            ).get(pk=pk)
+        except ClassSession.DoesNotExist:
+            return Response({'detail': 'Not found.'}, status=404)
+
+        student = _student_profile(request.user)
+        if not student or not _user_can_view_class(request.user, session.teaching_class):
+            return Response({'detail': 'Not found.'}, status=404)
+        if not session.is_started:
+            return Response({'detail': 'Start the class before sending homework submissions.'}, status=400)
+
+        submissions = list(
+            session.homework_submissions.filter(student=student).order_by('created_at', 'id')
+        )
+        comments = list(
+            session.comments.filter(student=student).select_related('author').order_by('created_at', 'id')
+        )
+        if not submissions and not comments:
+            return Response(
+                {'detail': 'Add a communication note or upload a homework file before sending.'},
+                status=400,
+            )
+
+        attachment_details = []
+        for submission in submissions:
+            filename = submission.original_filename or 'Homework attachment'
+            url = submission.file.url if submission.file else ''
+            if url and not url.startswith(('http://', 'https://')):
+                url = request.build_absolute_uri(url)
+            attachment_details.append(f'- {filename}{f": {url}" if url else ""}')
+        attachments = '\n'.join(attachment_details)
+        communication_notes = '\n'.join(
+            f'- {comment.author.get_full_name() or comment.author.username}: {comment.body}'
+            for comment in comments
+        )
+        submission_details = []
+        if communication_notes:
+            submission_details.append(f'Communication notes:\n{communication_notes}')
+        if attachments:
+            submission_details.append(f'Homework attachments:\n{attachments}')
+        content_details = '\n\n'.join(submission_details)
+        student_name = f'{request.user.first_name} {request.user.last_name}'.strip() or request.user.username
+        date_label = session.session_date.strftime('%d %B %Y')
+        teacher_recipients = [
+            teacher.user.email
+            for teacher in (session.teaching_class.teacher_1, session.teaching_class.teacher_2)
+            if teacher and teacher.user.email
+        ]
+        if not teacher_recipients:
+            return Response(
+                {'detail': 'No email address is available for this class teacher.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        subject = f'Homework submission of {student_name} for {session.teaching_class.name} — {date_label}'
+        messages = []
+        if teacher_recipients:
+            messages.append((
+                subject,
+                f'Dear Teacher,\n\n'
+                f'{student_name} has submitted homework for {session.teaching_class.name} on {date_label}.\n\n'
+                f'{content_details}\n\n'
+                f'With best regards,\nBalamukundam Vidyalayam\n',
+                settings.DEFAULT_FROM_EMAIL,
+                teacher_recipients,
+            ))
+        student_copy_sent = False
+        if request.user.email:
+            messages.append((
+                f'Homework submission confirmation: {session.teaching_class.name} — {date_label}',
+                f'Dear {student_name},\n\n'
+                f'Your homework for {session.teaching_class.name} on {date_label} has been submitted to the teacher.\n\n'
+                f'{content_details}\n\n'
+                f'With best regards,\nBalamukundam Vidyalayam\n',
+                settings.DEFAULT_FROM_EMAIL,
+                [request.user.email],
+            ))
+            student_copy_sent = True
+
+        send_mass_mail(messages, fail_silently=False) if messages else 0
+        attendance = ClassSessionAttendance.objects.filter(session=session, student=student).first()
+        if attendance and not attendance.homework_submitted:
+            attendance.homework_submitted = True
+            attendance.updated_by = request.user
+            attendance.save(update_fields=['homework_submitted', 'updated_by', 'updated_at'])
+        return Response({
+            'teacher_email_sent': bool(teacher_recipients),
+            'student_copy_sent': student_copy_sent,
+            'homework_submitted': bool(attendance and attendance.homework_submitted),
+        })
 
 
 class SessionHomeworkDetailView(APIView):

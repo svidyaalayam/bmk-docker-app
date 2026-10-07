@@ -372,6 +372,7 @@ class ClassSession(AuditModel):
     session_date = models.DateField()
     classwork = models.TextField(blank=True)
     homework = models.TextField(blank=True)
+    homework_due_date = models.DateField(null=True, blank=True)
     is_started = models.BooleanField(default=False)
     started_at = models.DateTimeField(null=True, blank=True)
 

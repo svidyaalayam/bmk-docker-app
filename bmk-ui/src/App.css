@@ -510,6 +510,16 @@ html[data-language="sa"] .platform-highlight {
   margin-top: 4px;
 }
 
+.siksha-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.siksha-cta .home-btn:disabled {
+  cursor: not-allowed;
+}
+
 .nav-link:hover,
 .nav-link.active {
   color: white;
@@ -2505,6 +2515,116 @@ th {
 
 .student-summary-table td {
   vertical-align: middle;
+}
+
+.class-email-recipients {
+  display: grid;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.class-email-recipients h3,
+.class-email-recipients h4 {
+  margin: 0;
+}
+
+.email-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.email-preview {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f8fbf9;
+}
+
+.email-preview p {
+  margin: 8px 0;
+}
+
+.email-preview pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.recipient-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recipient-heading span {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.recipient-list {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.recipient-list label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 500;
+}
+
+.homework-due-date {
+  padding: 12px 14px;
+  border: 1px solid #c9ddd2;
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f7fbf8, #eef7f1);
+}
+
+.homework-due-date-title {
+  color: var(--accent-dark);
+  font-size: 0.98rem;
+}
+
+.homework-due-date-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.homework-due-date input[type='date'] {
+  width: min(100%, 220px);
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid #9ebbaa;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.homework-due-date-field > span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .email-preview-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .student-summary-person {

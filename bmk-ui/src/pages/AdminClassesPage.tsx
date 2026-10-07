@@ -8,13 +8,14 @@ import {
   getClass,
   importCalendarDates,
   listClasses,
+  sendClassEmail,
   updateClass,
   updateSession,
 } from '../api/classes'
 import { listStudents, listTeachers } from '../api/school'
 import DataTable, { type DataTableColumn } from '../components/DataTable'
 import SiteHeader from '../components/SiteHeader'
-import type { TeachingClassDetail, TeachingClassListItem } from '../types/classes'
+import type { PersonBrief, TeachingClassDetail, TeachingClassListItem } from '../types/classes'
 import type { StudentProfile, TeacherProfile } from '../types/school'
 import { getErrorMessage } from '../utils/errors'
 import { adminClassesPath, dashboardPathForRole } from '../utils/routes'
@@ -214,6 +215,12 @@ function ClassEditor({
   const [calendarMessage, setCalendarMessage] = useState('')
   const [importingCalendar, setImportingCalendar] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [showEmailRecipients, setShowEmailRecipients] = useState(false)
+  const [selectedEmailTeacherIds, setSelectedEmailTeacherIds] = useState<number[]>([])
+  const [selectedEmailStudentIds, setSelectedEmailStudentIds] = useState<number[]>([])
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailMessage, setEmailMessage] = useState('')
+  const [emailError, setEmailError] = useState('')
   const calendarFileRef = useRef<HTMLInputElement>(null)
 
   const studentById = useMemo(() => {
@@ -326,6 +333,44 @@ function ClassEditor({
       onError(getErrorMessage(err, 'Could not delete class.'))
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const toggleRecipient = (id: number, selected: number[], setSelected: (ids: number[]) => void) => {
+    setSelected(selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id])
+  }
+
+  const openEmailRecipients = () => {
+    if (!detail) return
+    setEmailError('')
+    setEmailMessage('')
+    setSelectedEmailTeacherIds([])
+    setSelectedEmailStudentIds([])
+    setShowEmailRecipients(true)
+  }
+
+  const sendSelectedEmail = async () => {
+    if (!detail) return
+    const totalRecipients = selectedEmailTeacherIds.length + selectedEmailStudentIds.length
+    if (!totalRecipients) {
+      setEmailError('Select at least one teacher or student.')
+      return
+    }
+    if (!window.confirm(`Send this class email to ${totalRecipients} selected recipient${totalRecipients === 1 ? '' : 's'}?`)) return
+
+    setSendingEmail(true)
+    setEmailError('')
+    try {
+      const result = await sendClassEmail(detail.id, selectedEmailTeacherIds, selectedEmailStudentIds)
+      const skipped = result.skipped_no_email.length
+      setEmailMessage(
+        `${result.sent_count} email${result.sent_count === 1 ? '' : 's'} sent.${skipped ? ` ${skipped} recipient${skipped === 1 ? '' : 's'} skipped because no email address is available.` : ''}`,
+      )
+      setShowEmailRecipients(false)
+    } catch (err) {
+      setEmailError(getErrorMessage(err, 'Could not send class emails.'))
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -551,6 +596,16 @@ function ClassEditor({
               type="button"
               className="home-btn secondary"
               disabled={submitting}
+              onClick={openEmailRecipients}
+            >
+              Send email
+            </button>
+          )}
+          {mode === 'edit' && detail && (
+            <button
+              type="button"
+              className="home-btn secondary"
+              disabled={submitting}
               onClick={handleDelete}
             >
               Delete class
@@ -558,6 +613,30 @@ function ClassEditor({
           )}
         </div>
       </form>
+
+      {mode === 'edit' && detail && (
+        <section className="modal-section">
+          {emailMessage && <p className="success">{emailMessage}</p>}
+          {emailError && <p className="error">{emailError}</p>}
+          {showEmailRecipients && (
+            <ClassEmailRecipients
+              className={detail.name}
+              classDescription={detail.description}
+              teachers={[detail.teacher_1, detail.teacher_2].filter((teacher): teacher is PersonBrief => Boolean(teacher))}
+              students={detail.students}
+              selectedTeacherIds={selectedEmailTeacherIds}
+              selectedStudentIds={selectedEmailStudentIds}
+              sending={sendingEmail}
+              onToggleTeacher={(id) => toggleRecipient(id, selectedEmailTeacherIds, setSelectedEmailTeacherIds)}
+              onToggleStudent={(id) => toggleRecipient(id, selectedEmailStudentIds, setSelectedEmailStudentIds)}
+              onSelectAllStudents={() => setSelectedEmailStudentIds(detail.students.map((student) => student.id))}
+              onClearStudents={() => setSelectedEmailStudentIds([])}
+              onCancel={() => setShowEmailRecipients(false)}
+              onConfirm={sendSelectedEmail}
+            />
+          )}
+        </section>
+      )}
 
       {mode === 'edit' && detail && (
         <section className="modal-section">
@@ -629,3 +708,117 @@ function ClassEditor({
   )
 }
 
+function ClassEmailRecipients({
+  className,
+  classDescription,
+  teachers,
+  students,
+  selectedTeacherIds,
+  selectedStudentIds,
+  sending,
+  onToggleTeacher,
+  onToggleStudent,
+  onSelectAllStudents,
+  onClearStudents,
+  onCancel,
+  onConfirm,
+}: {
+  className: string
+  classDescription: string
+  teachers: PersonBrief[]
+  students: PersonBrief[]
+  selectedTeacherIds: number[]
+  selectedStudentIds: number[]
+  sending: boolean
+  onToggleTeacher: (id: number) => void
+  onToggleStudent: (id: number) => void
+  onSelectAllStudents: () => void
+  onClearStudents: () => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const teacherNames = teachers.map((teacher) => recipientName(teacher)).join(', ') || 'Not assigned'
+  const studentList = students.map((student) => `- ${recipientName(student)}`).join('\n') || '- No students currently assigned'
+  const description = classDescription.trim() || 'No class description has been provided.'
+  const subject = `Class update: ${className}`
+
+  return (
+    <div className="class-email-recipients">
+      <h3>Send class email</h3>
+      <p className="header-sub">
+        Teachers receive the complete student list and class description. Students receive their teacher name and class description.
+      </p>
+      <div className="email-preview-grid">
+        <section className="email-preview">
+          <h4>Teacher email preview</h4>
+          <p><strong>Subject:</strong> {subject}</p>
+          <pre>{`Hello [Teacher name],
+
+Class: ${className}
+
+Class description:
+${description}
+
+Current students:
+${studentList}`}</pre>
+        </section>
+        <section className="email-preview">
+          <h4>Student email preview</h4>
+          <p><strong>Subject:</strong> {subject}</p>
+          <pre>{`Hello [Student name],
+
+Class: ${className}
+Teacher${teachers.length === 1 ? '' : 's'}: ${teacherNames}
+
+Class description:
+${description}`}</pre>
+        </section>
+      </div>
+      <h4>Teachers</h4>
+      <div className="recipient-list">
+        {teachers.map((teacher) => (
+          <label key={teacher.id}>
+            <input
+              type="checkbox"
+              checked={selectedTeacherIds.includes(teacher.id)}
+              onChange={() => onToggleTeacher(teacher.id)}
+              disabled={sending}
+            />
+            {personLabel(teacher)}
+          </label>
+        ))}
+      </div>
+      <div className="recipient-heading">
+        <h4>Students ({students.length})</h4>
+        <span>
+          <button type="button" className="tab" onClick={onSelectAllStudents} disabled={sending || students.length === 0}>Select all</button>
+          <button type="button" className="tab" onClick={onClearStudents} disabled={sending || selectedStudentIds.length === 0}>Clear</button>
+        </span>
+      </div>
+      <div className="recipient-list">
+        {students.map((student) => (
+          <label key={student.id}>
+            <input
+              type="checkbox"
+              checked={selectedStudentIds.includes(student.id)}
+              onChange={() => onToggleStudent(student.id)}
+              disabled={sending}
+            />
+            {personLabel(student)}
+          </label>
+        ))}
+        {students.length === 0 && <p className="header-sub">No students are assigned to this class.</p>}
+      </div>
+      <div className="form-actions">
+        <button type="button" className="home-btn" onClick={onConfirm} disabled={sending}>
+          {sending ? 'Sending…' : 'Confirm and send email'}
+        </button>
+        <button type="button" className="home-btn secondary" onClick={onCancel} disabled={sending}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+function recipientName(person: PersonBrief): string {
+  return `${person.first_name || ''} ${person.last_name || ''}`.trim() || person.username
+}

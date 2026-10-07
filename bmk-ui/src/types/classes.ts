@@ -24,6 +24,7 @@ export interface ClassSession {
   session_date: string
   classwork: string
   homework: string
+  homework_due_date: string | null
   is_started: boolean
   started_at: string | null
   present_count?: number | null

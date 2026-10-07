@@ -2,6 +2,7 @@ from django.urls import path
 
 from .class_views import (
     ClassSessionDetailView,
+    ClassSessionEmailView,
     ClassCalendarImportView,
     ClassSessionListCreateView,
     ClassSessionStartView,
@@ -10,10 +11,12 @@ from .class_views import (
     SessionCommentDetailView,
     SessionCommentListCreateView,
     SessionHomeworkDetailView,
+    SessionHomeworkEmailView,
     SessionHomeworkListCreateView,
     SessionMaterialDetailView,
     SessionMaterialListCreateView,
     TeachingClassDetailView,
+    TeachingClassEmailView,
     TeachingClassListCreateView,
     TeachingClassStudentBlockView,
     TeachingClassStudentRemoveView,
@@ -81,6 +84,7 @@ urlpatterns = [
     path('students/<int:pk>/', StudentDetailView.as_view(), name='student-detail'),
     path('classes/', TeachingClassListCreateView.as_view(), name='class-list'),
     path('classes/<int:pk>/', TeachingClassDetailView.as_view(), name='class-detail'),
+    path('classes/<int:pk>/email/', TeachingClassEmailView.as_view(), name='class-email'),
     path('classes/<int:pk>/students/', TeachingClassStudentsView.as_view(), name='class-students'),
     path(
         'classes/<int:pk>/students/<int:student_id>/block/',
@@ -96,6 +100,7 @@ urlpatterns = [
     path('classes/<int:pk>/calendar/import/', ClassCalendarImportView.as_view(), name='class-calendar-import'),
     path('sessions/<int:pk>/', ClassSessionDetailView.as_view(), name='session-detail'),
     path('sessions/<int:pk>/start/', ClassSessionStartView.as_view(), name='session-start'),
+    path('sessions/<int:pk>/email/', ClassSessionEmailView.as_view(), name='session-email'),
     path('sessions/<int:pk>/attendance/', SessionAttendanceListView.as_view(), name='session-attendance'),
     path(
         'sessions/<int:pk>/attendance/<int:attendance_id>/',
@@ -105,6 +110,7 @@ urlpatterns = [
     path('sessions/<int:pk>/comments/', SessionCommentListCreateView.as_view(), name='session-comments'),
     path('comments/<int:pk>/', SessionCommentDetailView.as_view(), name='comment-detail'),
     path('sessions/<int:pk>/homework/', SessionHomeworkListCreateView.as_view(), name='session-homework'),
+    path('sessions/<int:pk>/homework/email/', SessionHomeworkEmailView.as_view(), name='session-homework-email'),
     path('homework/<int:pk>/', SessionHomeworkDetailView.as_view(), name='homework-detail'),
     path('sessions/<int:pk>/materials/', SessionMaterialListCreateView.as_view(), name='session-materials'),
     path('materials/<int:pk>/', SessionMaterialDetailView.as_view(), name='session-material-detail'),

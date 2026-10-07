@@ -2,6 +2,14 @@ import type { User } from './auth'
 
 export type Gender = 'M' | 'F' | 'O'
 
+export interface StudentClassAttendanceSummary {
+  class_id: number
+  class_name: string
+  present_classes: number
+  total_classes: number
+  attendance_percent: number | null
+}
+
 export interface StudentProfile {
   id: number
   user: User
@@ -18,6 +26,7 @@ export interface StudentProfile {
   created_at: string
   updated_at: string
   class_assignment_count: number
+  class_attendance_summary: StudentClassAttendanceSummary[]
 }
 
 export interface TeacherProfile {

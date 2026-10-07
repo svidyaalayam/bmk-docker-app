@@ -22,6 +22,8 @@ from .models import (
     Announcement,
     Course,
     CourseClass,
+    ClassMembership,
+    ClassSessionAttendance,
     Student,
     StudentTeacherRequest,
     Teacher,
@@ -578,6 +580,22 @@ class StudentListView(generics.ListAPIView):
         return (
             Student.objects.all()
             .select_related('user')
+            .prefetch_related(
+                Prefetch(
+                    'class_memberships',
+                    queryset=ClassMembership.objects.filter(
+                        teaching_class__is_active=True,
+                    ).select_related('teaching_class'),
+                    to_attr='admin_active_class_memberships',
+                ),
+                Prefetch(
+                    'session_attendance',
+                    queryset=ClassSessionAttendance.objects.filter(
+                        session__is_started=True,
+                    ).select_related('session__teaching_class'),
+                    to_attr='admin_started_session_attendance',
+                ),
+            )
             .annotate(
                 class_assignment_count=Count(
                     'class_memberships', filter=Q(class_memberships__teaching_class__is_active=True), distinct=True
@@ -591,7 +609,33 @@ class StudentDetailView(generics.RetrieveUpdateAPIView):
     http_method_names = ['get', 'put', 'patch', 'head', 'options']
 
     def get_queryset(self):
-        return Student.objects.all().select_related('user')
+        return (
+            Student.objects.all()
+            .select_related('user')
+            .prefetch_related(
+                Prefetch(
+                    'class_memberships',
+                    queryset=ClassMembership.objects.filter(
+                        teaching_class__is_active=True,
+                    ).select_related('teaching_class'),
+                    to_attr='admin_active_class_memberships',
+                ),
+                Prefetch(
+                    'session_attendance',
+                    queryset=ClassSessionAttendance.objects.filter(
+                        session__is_started=True,
+                    ).select_related('session__teaching_class'),
+                    to_attr='admin_started_session_attendance',
+                ),
+            )
+            .annotate(
+                class_assignment_count=Count(
+                    'class_memberships',
+                    filter=Q(class_memberships__teaching_class__is_active=True),
+                    distinct=True,
+                )
+            )
+        )
 
     def get_serializer_class(self):
         if self.request.method in ('PUT', 'PATCH'):

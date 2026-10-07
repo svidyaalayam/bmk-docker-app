@@ -143,6 +143,14 @@ export default function DashboardPage() {
 
           <p className="admin-cta siksha-cta">
             <SikshavahiniButton className="home-btn" />
+            <a
+              className="home-btn secondary"
+              href="https://varnamala.balamukundam.com"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open Varnamala →
+            </a>
           </p>
         </section>
       </div>

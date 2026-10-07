@@ -12,12 +12,13 @@ import {
   listComments,
   listHomework,
   listSessionMaterials,
+  sendSessionEmail,
+  sendHomeworkSubmissionEmail,
   startSession,
   updateAttendance,
   updateClass,
   updateComment,
   updateHomeworkFeedback,
-  updateHomeworkSubmitted,
   updateSession,
   uploadHomework,
   uploadSessionMaterial,
@@ -502,6 +503,7 @@ function SessionPanel({
 }) {
   const [classwork, setClasswork] = useState(session.classwork || '')
   const [homework, setHomework] = useState(session.homework || '')
+  const [homeworkDueDate, setHomeworkDueDate] = useState(session.homework_due_date || '')
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [focusStudentId, setFocusStudentId] = useState<number | null>(
     students[0]?.id ?? null,
@@ -511,11 +513,14 @@ function SessionPanel({
   const [homeworks, setHomeworks] = useState<HomeworkSubmission[]>([])
   const [materials, setMaterials] = useState<SessionMaterial[]>([])
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<number, string>>({})
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [sendingHomeworkEmail, setSendingHomeworkEmail] = useState(false)
 
   useEffect(() => {
     setClasswork(session.classwork || '')
     setHomework(session.homework || '')
-  }, [session.id, session.classwork, session.homework])
+    setHomeworkDueDate(session.homework_due_date || '')
+  }, [session.id, session.classwork, session.homework, session.homework_due_date])
 
   const loadSideData = useCallback(async () => {
     const [att, hw, mats] = await Promise.all([
@@ -548,7 +553,11 @@ function SessionPanel({
 
   const saveNotes = async () => {
     try {
-      await updateSession(session.id, { classwork, homework })
+      await updateSession(session.id, {
+        classwork,
+        homework,
+        homework_due_date: homeworkDueDate || null,
+      })
       onMessage('Classwork / homework notes saved.')
       await onSessionUpdated()
     } catch (err) {
@@ -564,6 +573,30 @@ function SessionPanel({
       await loadSideData()
     } catch (err) {
       onError(getErrorMessage(err, 'Could not start class.'))
+    }
+  }
+
+  const handleSendSessionEmail = async () => {
+    if (!window.confirm('Send the classwork, homework, attachments, and attendance email to all students in this class?')) return
+    setSendingEmail(true)
+    try {
+      // Save the current teacher edits so the email always uses the visible
+      // classwork, homework, and target date.
+      await updateSession(session.id, {
+        classwork,
+        homework,
+        homework_due_date: homeworkDueDate || null,
+      })
+      const result = await sendSessionEmail(session.id)
+      const skipped = result.skipped_no_email_student_ids.length
+      onMessage(
+        `Class email sent.${result.teacher_copy_sent ? ' A summary was sent to your email address.' : ''}${skipped ? ' Some students were skipped because no email address is available.' : ''}`,
+      )
+      await onSessionUpdated()
+    } catch (err) {
+      onError(getErrorMessage(err, 'Could not send the class email.'))
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -593,18 +626,6 @@ function SessionPanel({
       await onSessionUpdated()
     } catch (err) {
       onError(getErrorMessage(err, 'Could not mark all present.'))
-    }
-  }
-
-  const toggleHomeworkSubmitted = async (checked: boolean) => {
-    const mine = attendance[0]
-    if (!mine) return
-    try {
-      const updated = await updateHomeworkSubmitted(session.id, mine.id, checked)
-      setAttendance([updated])
-      onMessage(checked ? 'Marked homework as submitted.' : 'Homework submission cleared.')
-    } catch (err) {
-      onError(getErrorMessage(err, 'Could not update homework submission.'))
     }
   }
 
@@ -654,6 +675,27 @@ function SessionPanel({
     } catch (err) {
       onError(getErrorMessage(err, 'Could not upload homework.'))
       throw err
+    }
+  }
+
+  const handleSendHomeworkEmail = async () => {
+    if (!window.confirm('Send your communication notes and homework attachment links to your teacher? You will receive a copy by email.')) return
+    setSendingHomeworkEmail(true)
+    try {
+      const result = await sendHomeworkSubmissionEmail(session.id)
+      if (result.homework_submitted) {
+        setAttendance((previous) => previous.map((record) => ({
+          ...record,
+          homework_submitted: true,
+        })))
+      }
+      onMessage(
+        `Homework submission email sent to your teacher.${result.student_copy_sent ? ' A copy was sent to your email address.' : ''}${!result.teacher_email_sent ? ' No teacher email address is available.' : ''}`,
+      )
+    } catch (err) {
+      onError(getErrorMessage(err, 'Could not send the homework submission email.'))
+    } finally {
+      setSendingHomeworkEmail(false)
     }
   }
 
@@ -756,6 +798,21 @@ function SessionPanel({
               readOnly={!isTeacher}
             />
           </label>
+          <label className="full homework-due-date">
+            <span className="homework-due-date-title">Homework target date</span>
+            <span className="homework-due-date-field">
+              <input
+                type="date"
+                value={homeworkDueDate}
+                onChange={(e) => setHomeworkDueDate(e.target.value)}
+                disabled={!isTeacher}
+                aria-describedby="homework-due-date-help"
+              />
+              <span id="homework-due-date-help">
+                Students will see this date in their homework email.
+              </span>
+            </span>
+          </label>
           <div className="full material-block">
             <h3>Homework files (from teacher)</h3>
             {isTeacher && (
@@ -800,7 +857,17 @@ function SessionPanel({
             Save notes
           </button>
           {session.is_started ? (
-            <span className="session-started-pill large">Started</span>
+            <>
+              <span className="session-started-pill large">Started</span>
+              <button
+                type="button"
+                className="home-btn secondary"
+                onClick={handleSendSessionEmail}
+                disabled={sendingEmail}
+              >
+                {sendingEmail ? 'Sending email…' : 'Send email'}
+              </button>
+            </>
           ) : (
             <>
               <button
@@ -915,7 +982,7 @@ function SessionPanel({
             <input
               type="checkbox"
               checked={Boolean(attendance[0].homework_submitted)}
-              onChange={(e) => toggleHomeworkSubmitted(e.target.checked)}
+              disabled
             />
             Homework submitted
           </label>
@@ -998,7 +1065,7 @@ function SessionPanel({
 
           <form className="admin-form" onSubmit={handleAddComment}>
             <label className="full">
-              Add message
+              Add note
               <textarea
                 rows={2}
                 value={commentBody}
@@ -1007,7 +1074,7 @@ function SessionPanel({
               />
             </label>
             <button type="submit" className="home-btn">
-              Post message
+              Add note
             </button>
           </form>
         </>
@@ -1019,11 +1086,25 @@ function SessionPanel({
 
       <h3>Student's homework submissions</h3>
       {isStudent && session.is_started && (
-        <MediaCaptureUpload
-          label="Choose homework file"
-          maxBytes={10 * 1024 * 1024}
-          onUpload={handleUpload}
-        />
+        <>
+          <MediaCaptureUpload
+            label="Choose homework file"
+            maxBytes={10 * 1024 * 1024}
+            onUpload={handleUpload}
+          />
+          {(homeworks.length > 0 || comments.length > 0) && (
+            <p>
+              <button
+                type="button"
+                className="home-btn secondary"
+                onClick={handleSendHomeworkEmail}
+                disabled={sendingHomeworkEmail}
+              >
+                {sendingHomeworkEmail ? 'Sending email…' : 'Send email to teacher'}
+              </button>
+            </p>
+          )}
+        </>
       )}
       {isStudent && !session.is_started && (
         <p className="header-sub">
