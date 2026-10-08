@@ -22,7 +22,10 @@ from .models import (
 
 @admin.register(SchoolSettings)
 class SchoolSettingsAdmin(admin.ModelAdmin):
-    list_display = ('school_name', 'school_slug', 'lesson_app', 'secondary_language', 'updated_at')
+    list_display = (
+        'school_name', 'school_slug', 'lesson_app', 'open_student_registration',
+        'secondary_language', 'updated_at',
+    )
     list_filter = ('secondary_language', 'lesson_app')
     search_fields = ('school_name', 'school_slug')
     fieldsets = (
@@ -31,6 +34,10 @@ class SchoolSettingsAdmin(admin.ModelAdmin):
         }),
         ('Introduction page', {
             'fields': ('introduction', 'secondary_language', 'introduction_secondary'),
+        }),
+        ('Registration', {
+            'fields': ('open_student_registration',),
+            'description': 'Teacher registration is always open.',
         }),
         ('Student account blocking', {
             'fields': ('unauthorised_absence_block_threshold',),

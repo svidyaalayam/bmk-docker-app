@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from authentication.permissions import IsAdminRole, IsStudentRole, IsTeacherRole
 from bmk_api_project.version import API_VERSION
+from school.tenancy import resolve_school
 from .emails import send_confirmation_email
 from .serializers import (
     AvatarUploadSerializer,
@@ -81,6 +82,12 @@ class StudentRegisterView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        school = resolve_school(request, required=True)
+        if not school.open_student_registration:
+            return Response(
+                {'detail': 'Student registrations are closed for this year.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = StudentRegistrationSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()

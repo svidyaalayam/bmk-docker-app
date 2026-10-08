@@ -25,6 +25,7 @@ const fallbackSchool: SchoolSettings = {
   introduction_secondary: '',
   footer_text: '',
   terms_and_conditions: '',
+  open_student_registration: false,
   updated_at: '',
 }
 

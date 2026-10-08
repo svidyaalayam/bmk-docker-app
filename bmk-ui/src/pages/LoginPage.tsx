@@ -102,9 +102,15 @@ export default function LoginPage() {
           {error && <p className="error">{error}</p>}
 
           <div className="auth-register-actions">
-            <Link to={studentRegisterPath()} className="auth-btn secondary">
-              New User Register
-            </Link>
+            {school.open_student_registration ? (
+              <Link to={studentRegisterPath()} className="auth-btn secondary">
+                New User Register
+              </Link>
+            ) : (
+              <span className="auth-btn secondary is-disabled" aria-disabled="true">
+                Registrations closed for this year
+              </span>
+            )}
             <p className="auth-register-hint">
               Teacher? <Link to={teacherRegisterPath()}>Register as teacher</Link>
             </p>

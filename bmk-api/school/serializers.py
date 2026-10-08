@@ -99,6 +99,7 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'introduction_secondary',
             'footer_text',
             'terms_and_conditions',
+            'open_student_registration',
             'updated_at',
         )
 

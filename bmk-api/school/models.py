@@ -84,6 +84,10 @@ class SchoolSettings(models.Model):
         default='',
         help_text='Terms shown on the sign-in page and accepted before login.',
     )
+    open_student_registration = models.BooleanField(
+        default=False,
+        help_text='Allow new students to register. Teacher registration is always available.',
+    )
     unauthorised_absence_block_threshold = models.PositiveIntegerField(
         default=3,
         validators=[MinValueValidator(1)],

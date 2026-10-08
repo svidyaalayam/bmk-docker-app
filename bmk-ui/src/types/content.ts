@@ -37,6 +37,7 @@ export interface SchoolSettings {
   introduction_secondary: string
   footer_text: string
   terms_and_conditions: string
+  open_student_registration: boolean
   updated_at: string
 }
 

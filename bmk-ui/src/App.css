@@ -1420,6 +1420,13 @@ button.class-tab.active:hover {
   background: rgba(45, 90, 70, 0.08);
 }
 
+.auth-btn.secondary.is-disabled {
+  cursor: not-allowed;
+  border-color: rgba(45, 90, 70, 0.3);
+  background: rgba(45, 90, 70, 0.08);
+  color: var(--muted);
+}
+
 .auth-register-hint {
   margin: 0;
   text-align: center;

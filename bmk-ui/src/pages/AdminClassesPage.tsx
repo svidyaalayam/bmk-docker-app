@@ -203,6 +203,8 @@ function ClassEditor({
   const [teacher1Id, setTeacher1Id] = useState(detail?.teacher_1.id || teachers[0]?.id || 0)
   const [teacher2Id, setTeacher2Id] = useState<number | ''>(detail?.teacher_2?.id || '')
   const [teacherError, setTeacherError] = useState('')
+  const [teacher1Filter, setTeacher1Filter] = useState('')
+  const [teacher2Filter, setTeacher2Filter] = useState('')
   const [selectedStudents, setSelectedStudents] = useState<number[]>(
     detail?.students.map((s) => s.id) || [],
   )
@@ -251,9 +253,26 @@ function ClassEditor({
       .sort((a, b) => personLabel(a.user).localeCompare(personLabel(b.user)))
   }, [selectedStudents, studentById])
 
+  const filterTeachers = (items: TeacherProfile[], filter: string, selectedId: number | '') => {
+    const query = filter.trim().toLowerCase()
+    return items
+      .filter((teacher) => {
+        if (teacher.id === selectedId || !query) return true
+        const label = personLabel(teacher.user).toLowerCase()
+        const email = (teacher.user.email || '').toLowerCase()
+        return label.includes(query) || email.includes(query)
+      })
+      .sort((a, b) => personLabel(a.user).localeCompare(personLabel(b.user)))
+  }
+
+  const teacher1Options = useMemo(
+    () => filterTeachers(teachers, teacher1Filter, teacher1Id),
+    [teachers, teacher1Filter, teacher1Id],
+  )
+
   const teacher2Options = useMemo(
-    () => teachers.filter((t) => t.id !== teacher1Id),
-    [teachers, teacher1Id],
+    () => filterTeachers(teachers.filter((t) => t.id !== teacher1Id), teacher2Filter, teacher2Id),
+    [teachers, teacher1Id, teacher2Filter, teacher2Id],
   )
 
   const selectTeacher1 = (id: number) => {
@@ -500,13 +519,20 @@ function ClassEditor({
           </label>
           <label>
             Teacher 1 (required)
+            <input
+              type="search"
+              value={teacher1Filter}
+              onChange={(e) => setTeacher1Filter(e.target.value)}
+              placeholder="Filter by name or email…"
+              aria-label="Filter Teacher 1 options"
+            />
             <select
               value={teacher1Id || ''}
               onChange={(e) => selectTeacher1(Number(e.target.value))}
               required
             >
               <option value="">Select…</option>
-              {teachers.map((t) => (
+              {teacher1Options.map((t) => (
                 <option key={t.id} value={t.id}>
                   {personLabel(t.user)}
                 </option>
@@ -515,6 +541,13 @@ function ClassEditor({
           </label>
           <label>
             Teacher 2 (optional)
+            <input
+              type="search"
+              value={teacher2Filter}
+              onChange={(e) => setTeacher2Filter(e.target.value)}
+              placeholder="Filter by name or email…"
+              aria-label="Filter Teacher 2 options"
+            />
             <select value={teacher2Id} onChange={(e) => selectTeacher2(e.target.value)}>
               <option value="">None</option>
               {teacher2Options.map((t) => (

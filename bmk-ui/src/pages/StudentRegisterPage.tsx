@@ -63,14 +63,20 @@ export default function StudentRegisterPage() {
         <div className="auth-card wide">
           <p className="brand">{school.school_name || schoolSlug}</p>
           <h1>Student registration</h1>
-          <p className="subtitle">
-            Please check your details carefully. After you submit, you cannot change them.
-          </p>
-          <p className="subtitle notice">
-            We use date of birth to place students in classes by age, and to send birthday wishes.
-          </p>
+          {!school.open_student_registration ? (
+            <p className="subtitle notice">Registrations closed for this year.</p>
+          ) : (
+            <>
+              <p className="subtitle">
+                Please check your details carefully. After you submit, you cannot change them.
+              </p>
+              <p className="subtitle notice">
+                We use date of birth to place students in classes by age, and to send birthday wishes.
+              </p>
+            </>
+          )}
 
-          {message ? (
+          {!school.open_student_registration ? null : message ? (
             <p className="success">{message}</p>
           ) : (
             <form onSubmit={handleSubmit} className="auth-form">
@@ -160,7 +166,7 @@ export default function StudentRegisterPage() {
             </form>
           )}
 
-          {error && <p className="error">{error}</p>}
+          {school.open_student_registration && error && <p className="error">{error}</p>}
 
           <p className="auth-footer">
             Have an account? <Link to={schoolLoginPath()}>Login</Link>
