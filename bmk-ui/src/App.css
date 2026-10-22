@@ -2965,3 +2965,142 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ========================================================
+   Mobile fixes — Term Dates/Holidays & Happy Birthday tables
+   ======================================================== */
+
+/* Smooth iOS momentum scrolling for any overflow wrapper */
+.table-wrap {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 720px) {
+  /* Tighten home-panel padding so tables get every pixel */
+  .home-panel {
+    padding: 16px 14px;
+  }
+
+  /* Reset fixed min-widths that cause overflow */
+  .calendar-table,
+  .birthday-table {
+    min-width: unset;
+    width: 100%;
+  }
+
+  /* Hide desktop header row */
+  .calendar-table thead,
+  .birthday-table thead {
+    display: none;
+  }
+
+  .calendar-table tbody,
+  .birthday-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  /* ---- Calendar table: vertical card per entry ---- */
+  .calendar-table tr {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid #d8e5df;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
+  }
+
+  .calendar-table td {
+    display: block;
+    padding: 0;
+    border: none;
+  }
+
+  /* Row 1: Type pill (left) + nothing — pill already self-contained */
+  .calendar-table td:nth-child(1) {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Row 2: Date range */
+  .calendar-table td:nth-child(2) {
+    font-size: 0.87rem;
+    font-weight: 600;
+    color: var(--accent-dark, #1a5c3a);
+  }
+
+  /* Row 3: Title + optional notes, separated by dashed divider */
+  .calendar-table td:nth-child(3) {
+    border-top: 1px dashed #e2e8f0;
+    padding-top: 8px;
+    margin-top: 2px;
+    font-size: 0.92rem;
+  }
+
+  .calendar-table td:nth-child(3) strong {
+    display: block;
+    color: var(--accent-dark, #1a5c3a);
+  }
+
+  /* ---- Birthday table: 2-column card (name+teacher | date badge) ---- */
+  .birthday-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 4px 10px;
+    background: #f7fbf8;
+    border: 1px solid #d4e7dd;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+
+  .birthday-table td {
+    display: block;
+    padding: 0;
+    border: none;
+  }
+
+  /* Student name — top left */
+  .birthday-table td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-dark, #1a5c3a);
+  }
+
+  /* Class teacher — bottom left */
+  .birthday-table td:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 0.82rem;
+    color: var(--muted, #6b7280);
+  }
+
+  .birthday-table td:nth-child(2)::before {
+    content: "Teacher: ";
+    font-weight: 600;
+    color: var(--accent-dark, #1a5c3a);
+  }
+
+  /* Birthday date badge — right, spans both rows */
+  .birthday-table td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent, #2e7d4f);
+    background: #eaf4ef;
+    border: 1px solid #c2ded0;
+    padding: 6px 12px;
+    border-radius: 999px;
+    text-align: center;
+    white-space: nowrap;
+    align-self: center;
+  }
+}

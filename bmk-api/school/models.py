@@ -141,6 +141,16 @@ class Announcement(AuditModel):
     )
     display_order = models.PositiveIntegerField(default=0)
     is_published = models.BooleanField(default=True)
+    email_sent_at = models.DateTimeField(null=True, blank=True, editable=False)
+    email_sent_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name='sent_announcements',
+    )
+    email_recipient_count = models.PositiveIntegerField(default=0, editable=False)
 
     class Meta:
         ordering = ['display_order', '-created_at', 'id']

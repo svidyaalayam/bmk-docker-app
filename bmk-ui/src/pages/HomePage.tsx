@@ -303,36 +303,100 @@ export default function HomePage() {
             )}
           </div>
         </section>
+      </main>
 
-        <section id="courses" className="home-section">
-          <div className="home-section-head">
-            <h2>Courses & Classes</h2>
-            <p>
-              Each course has its own classes with aim, conditions, and
-              curriculum
+      {birthdays.length > 0 && (
+        <section className="home-section birthday-section" aria-labelledby="birthday-title">
+          <div className="home-panel">
+            <h2 id="birthday-title">Happy Birthday!</h2>
+            <p className="birthday-message">
+              We convey best birthday wishes to our amazing students celebrating
+              in this week.
             </p>
-          </div>
-
-          {courses.length === 0 && !loading && (
-            <article className="home-panel">
-              <p>
-                No courses published yet. Add courses and classes in Django
-                admin.
+            {secondaryLanguage && BIRTHDAY_GREETINGS[secondaryLanguage] && (
+              <p className={`birthday-greeting ${scriptClassForLanguage(secondaryLanguage)}`}>
+                {BIRTHDAY_GREETINGS[secondaryLanguage]}
               </p>
-            </article>
-          )}
-
-          <div className="course-stack">
-            {courses.map((course) => (
-              <CourseBlock
-                key={course.id}
-                course={course}
-                schoolSecondaryLanguage={secondaryLanguage}
-              />
-            ))}
+            )}
+            <div className="table-wrap birthday-table-wrap">
+              <table className="birthday-table">
+                <thead>
+                  <tr>
+                    <th>Student name</th>
+                    <th>Class teacher</th>
+                    <th>Birthday</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {birthdays.map((student) => (
+                    <tr key={`${student.name}-${student.date}`}>
+                      <td><strong>{student.name}</strong></td>
+                      <td>{student.teacher}</td>
+                      <td>{formatBirthdayDate(student.date)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
-      </main>
+      )}
+
+      {announcements.length > 0 && (
+        <section className="home-section announcements-section" aria-labelledby="announcements-title">
+          <div className="home-panel">
+            <h2 id="announcements-title">Announcements</h2>
+            <div className="announcement-list">
+              {announcements.map((announcement) => (
+                <article className="announcement-card" key={announcement.id}>
+                  <div className="announcement-content">
+                    <h3>{announcement.title}</h3>
+                    {announcement.message && (
+                      <p className="announcement-message">{announcement.message}</p>
+                    )}
+                  </div>
+                  {announcement.image_url && (
+                    <img
+                      className="announcement-image"
+                      src={announcement.image_url}
+                      alt={announcement.title}
+                    />
+                  )}
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section id="courses" className="home-section">
+        <div className="home-section-head">
+          <h2>Courses &amp; Classes</h2>
+          <p>
+            Each course has its own classes with aim, conditions, and
+            curriculum
+          </p>
+        </div>
+
+        {courses.length === 0 && !loading && (
+          <article className="home-panel">
+            <p>
+              No courses published yet. Add courses and classes in Django
+              admin.
+            </p>
+          </article>
+        )}
+
+        <div className="course-stack">
+          {courses.map((course) => (
+            <CourseBlock
+              key={course.id}
+              course={course}
+              schoolSecondaryLanguage={secondaryLanguage}
+            />
+          ))}
+        </div>
+      </section>
 
       {academicCalendar.length > 0 && (
         <section className="home-section calendar-section" aria-labelledby="calendar-title">
@@ -379,70 +443,6 @@ export default function HomePage() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {announcements.length > 0 && (
-        <section className="home-section announcements-section" aria-labelledby="announcements-title">
-          <div className="home-panel">
-            <h2 id="announcements-title">Announcements</h2>
-            <div className="announcement-list">
-              {announcements.map((announcement) => (
-                <article className="announcement-card" key={announcement.id}>
-                  <div className="announcement-content">
-                    <h3>{announcement.title}</h3>
-                    {announcement.message && (
-                      <p className="announcement-message">{announcement.message}</p>
-                    )}
-                  </div>
-                  {announcement.image_url && (
-                    <img
-                      className="announcement-image"
-                      src={announcement.image_url}
-                      alt={announcement.title}
-                    />
-                  )}
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {birthdays.length > 0 && (
-        <section className="home-section birthday-section" aria-labelledby="birthday-title">
-          <div className="home-panel">
-            <h2 id="birthday-title">Happy Birthday!</h2>
-            <p className="birthday-message">
-              We convey best birthday wishes to our amazing students celebrating
-              in this week.
-            </p>
-            {secondaryLanguage && BIRTHDAY_GREETINGS[secondaryLanguage] && (
-              <p className={`birthday-greeting ${scriptClassForLanguage(secondaryLanguage)}`}>
-                {BIRTHDAY_GREETINGS[secondaryLanguage]}
-              </p>
-            )}
-            <div className="table-wrap birthday-table-wrap">
-              <table className="birthday-table">
-                <thead>
-                  <tr>
-                    <th>Student name</th>
-                    <th>Class teacher</th>
-                    <th>Birthday</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {birthdays.map((student) => (
-                    <tr key={`${student.name}-${student.date}`}>
-                      <td><strong>{student.name}</strong></td>
-                      <td>{student.teacher}</td>
-                      <td>{formatBirthdayDate(student.date)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         </section>

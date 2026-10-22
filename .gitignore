@@ -75,3 +75,5 @@ tmp_*.txt
 *.bak
 *.orig
 *~
+backups/
+*.sql

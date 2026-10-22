@@ -4,6 +4,7 @@ import { fetchDashboard } from "../api/auth";
 import { useAuth } from "../auth/AuthContext";
 import SiteHeader from "../components/SiteHeader";
 import SikshavahiniButton from "../components/SikshavahiniButton";
+import WordGardenButton from "../components/WordGardenButton";
 import { useSchoolContent } from "../content/SchoolContentContext";
 import type { DashboardPayload } from "../types/auth";
 import uiPackage from "../../package.json";
@@ -142,7 +143,8 @@ export default function DashboardPage() {
           )}
 
           <p className="admin-cta siksha-cta">
-            <SikshavahiniButton className="home-btn" />
+            <WordGardenButton className="home-btn" />
+            <SikshavahiniButton className="home-btn secondary" />
             <a
               className="home-btn secondary"
               href="https://varnamala.balamukundam.com"

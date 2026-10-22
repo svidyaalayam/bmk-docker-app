@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div id="content-main">
+  <h1>Send announcement email</h1>
+  <p><strong>{{ announcement.title }}</strong></p>
+  <p>This will send one email per recipient to <strong>{{ recipient_count }}</strong> active, confirmed user{{ recipient_count|pluralize }}. Email addresses are not shared with other recipients.</p>
+  <p>Only published announcements can be sent. The announcement’s title and message will be used; images remain available in the portal and are not attached.</p>
+  <form method="post">{% csrf_token %}
+    <input type="submit" class="default" value="Send to {{ recipient_count }} users">
+    <a href="{% url 'admin:school_announcement_change' announcement.id %}" class="button cancel-link">Cancel</a>
+  </form>
+</div>
+{% endblock %}

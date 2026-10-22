@@ -1,0 +1,7 @@
+{% extends "admin/change_form.html" %}
+{% block object-tools-items %}
+  {{ block.super }}
+  {% if announcement_email_url %}
+    <li><a href="{{ announcement_email_url }}">Send announcement email</a></li>
+  {% endif %}
+{% endblock %}

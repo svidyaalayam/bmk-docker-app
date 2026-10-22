@@ -1,4 +1,13 @@
-from django.contrib import admin
+from django.conf import settings
+from django.contrib import admin, messages
+from django.core.mail import send_mass_mail
+from django.shortcuts import get_object_or_404, redirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
+from django.utils import timezone
+from django.utils.html import format_html
+from django.db.models import Q
+from django.contrib.auth import get_user_model
 
 from .models import (
     AcademicCalendarEntry,
@@ -18,6 +27,8 @@ from .models import (
     Teacher,
     TeachingClass,
 )
+
+User = get_user_model()
 
 
 @admin.register(SchoolSettings)
@@ -61,7 +72,8 @@ class DailyBirthdaySnapshotAdmin(admin.ModelAdmin):
 
 @admin.register(Announcement)
 class AnnouncementAdmin(admin.ModelAdmin):
-    list_display = ('title', 'start_date', 'end_date', 'is_published', 'display_order')
+    change_form_template = 'admin/school/announcement/change_form.html'
+    list_display = ('title', 'start_date', 'end_date', 'is_published', 'email_status', 'display_order')
     list_filter = ('is_published',)
     search_fields = ('title', 'message')
     ordering = ('display_order', '-created_at', 'id')
@@ -72,7 +84,67 @@ class AnnouncementAdmin(admin.ModelAdmin):
         ('Visibility', {
             'fields': ('start_date', 'end_date', 'is_published', 'display_order'),
         }),
+        ('Email delivery', {
+            'fields': ('email_sent_at', 'email_sent_by', 'email_recipient_count'),
+            'description': 'Use “Send announcement email” after saving this announcement.',
+        }),
     )
+    readonly_fields = ('email_sent_at', 'email_sent_by', 'email_recipient_count')
+
+    @admin.display(description='Email delivery')
+    def email_status(self, obj):
+        if not obj.email_sent_at:
+            return 'Not sent'
+        return f'Sent to {obj.email_recipient_count} on {obj.email_sent_at:%d %b %Y %H:%M}'
+
+    def get_urls(self):
+        return [
+            path(
+                '<int:announcement_id>/send-email/',
+                self.admin_site.admin_view(self.send_email_view),
+                name='school_announcement_send_email',
+            ),
+        ] + super().get_urls()
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        if object_id:
+            url = reverse('admin:school_announcement_send_email', args=[object_id])
+            extra_context['announcement_email_url'] = url
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def send_email_view(self, request, announcement_id):
+        announcement = get_object_or_404(Announcement, pk=announcement_id)
+        recipients = User.objects.filter(is_active=True).filter(
+            Q(email_verified=True) | Q(is_superuser=True)
+        ).exclude(email='').values_list('email', flat=True).distinct()
+        recipient_list = list(recipients)
+        if request.method == 'POST':
+            if not announcement.is_published:
+                self.message_user(request, 'Publish the announcement before sending it by email.', messages.ERROR)
+                return redirect(reverse('admin:school_announcement_change', args=[announcement.id]))
+            body = announcement.message.strip() or 'A new school announcement is available in the school portal.'
+            body += '\n\nPlease do not reply to this automated message.'
+            email_messages = [(announcement.title, body, settings.DEFAULT_FROM_EMAIL, [email]) for email in recipient_list]
+            try:
+                sent_count = send_mass_mail(email_messages, fail_silently=False) if email_messages else 0
+            except Exception:
+                self.message_user(request, 'Email sending failed. No delivery record was saved; check the mail configuration and try again.', messages.ERROR)
+                return redirect(reverse('admin:school_announcement_change', args=[announcement.id]))
+            announcement.email_sent_at = timezone.now()
+            announcement.email_sent_by = request.user
+            announcement.email_recipient_count = sent_count
+            announcement.save(update_fields=('email_sent_at', 'email_sent_by', 'email_recipient_count', 'updated_at'))
+            self.message_user(request, f'Announcement email sent individually to {sent_count} recipient(s).', messages.SUCCESS)
+            return redirect(reverse('admin:school_announcement_change', args=[announcement.id]))
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Send announcement email',
+            'announcement': announcement,
+            'recipient_count': len(recipient_list),
+            'opts': self.model._meta,
+        }
+        return TemplateResponse(request, 'admin/school/announcement/send_email.html', context)
 
 
 @admin.register(AcademicCalendarEntry)
