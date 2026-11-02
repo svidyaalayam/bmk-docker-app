@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
   createComment,
   createSession,
@@ -22,10 +22,10 @@ import {
   updateSession,
   uploadHomework,
   uploadSessionMaterial,
-} from '../api/classes'
-import { useAuth } from '../auth/AuthContext'
-import SiteHeader from '../components/SiteHeader'
-import MediaCaptureUpload from '../components/MediaCaptureUpload'
+} from "../api/classes";
+import { useAuth } from "../auth/AuthContext";
+import SiteHeader from "../components/SiteHeader";
+import MediaCaptureUpload from "../components/MediaCaptureUpload";
 import type {
   AttendanceRecord,
   AttendanceStatus,
@@ -36,186 +36,196 @@ import type {
   SessionMaterial,
   SessionMaterialKind,
   TeachingClassDetail,
-} from '../types/classes'
-import { ATTENDANCE_LABELS } from '../types/classes'
-import { getErrorMessage } from '../utils/errors'
-import { myClassesPath } from '../utils/routes'
+} from "../types/classes";
+import { ATTENDANCE_LABELS } from "../types/classes";
+import { getErrorMessage } from "../utils/errors";
+import { myClassesPath } from "../utils/routes";
 
 function personLabel(p: PersonBrief): string {
-  const name = `${p.first_name || ''} ${p.last_name || ''}`.trim()
-  const email = p.email || 'No email available'
-  return name ? `${name} (${email})` : email
+  const name = `${p.first_name || ""} ${p.last_name || ""}`.trim();
+  const email = p.email || "No email available";
+  return name ? `${name} (${email})` : email;
 }
 
 function personName(p: PersonBrief): string {
-  return `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email || p.username
+  return (
+    `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || p.username
+  );
 }
 
 function personInitials(p: PersonBrief): string {
-  const initials = `${p.first_name?.[0] || ''}${p.last_name?.[0] || ''}`.toUpperCase()
-  if (initials) return initials
-  return (p.username || p.email || '?').slice(0, 2).toUpperCase()
+  const initials =
+    `${p.first_name?.[0] || ""}${p.last_name?.[0] || ""}`.toUpperCase();
+  if (initials) return initials;
+  return (p.username || p.email || "?").slice(0, 2).toUpperCase();
 }
 
 function formatSessionDate(isoDate: string): string {
-  const d = new Date(`${isoDate}T00:00:00`)
-  if (Number.isNaN(d.getTime())) return isoDate
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return isoDate;
   return d.toLocaleDateString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function isFutureSession(isoDate: string): boolean {
-  const today = new Date()
+  const today = new Date();
   const todayIso = [
     today.getFullYear(),
-    String(today.getMonth() + 1).padStart(2, '0'),
-    String(today.getDate()).padStart(2, '0'),
-  ].join('-')
-  return isoDate > todayIso
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+  return isoDate > todayIso;
 }
 
 function presentSummary(present: number, total: number): string {
-  if (total <= 0) return 'Present = 0/0'
-  const pct = Math.round((present / total) * 100)
-  return `Present = ${present}/${total} (${pct}%)`
+  if (total <= 0) return "Present = 0/0";
+  const pct = Math.round((present / total) * 100);
+  return `Present = ${present}/${total} (${pct}%)`;
 }
 
 function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 const ATTENDANCE_OPTIONS: {
-  status: AttendanceStatus
-  short: string
-  className: string
-  title: string
+  status: AttendanceStatus;
+  short: string;
+  className: string;
+  title: string;
 }[] = [
-  { status: 'PRESENT', short: 'P', className: 'att-p', title: 'Present' },
+  { status: "PRESENT", short: "P", className: "att-p", title: "Present" },
   {
-    status: 'AUTHORISED_ABSENT',
-    short: 'AA',
-    className: 'att-aa',
-    title: 'Authorised absent',
+    status: "AUTHORISED_ABSENT",
+    short: "AA",
+    className: "att-aa",
+    title: "Authorised absent",
   },
   {
-    status: 'UNAUTHORISED_ABSENT',
-    short: 'UA',
-    className: 'att-ua',
-    title: 'Unauthorised absent',
+    status: "UNAUTHORISED_ABSENT",
+    short: "UA",
+    className: "att-ua",
+    title: "Unauthorised absent",
   },
-  { status: 'NOT_MARKED', short: 'N', className: 'att-n', title: 'Not marked' },
-]
+  { status: "NOT_MARKED", short: "N", className: "att-n", title: "Not marked" },
+];
 
 export default function ClassDetailPage() {
-  const { classId } = useParams()
-  const id = Number(classId)
-  const { user } = useAuth()
-  const isTeacher = user?.role === 'TEACHER'
-  const isStudent = user?.role === 'STUDENT'
+  const { classId } = useParams();
+  const id = Number(classId);
+  const { user } = useAuth();
+  const isTeacher = user?.role === "TEACHER";
+  const isStudent = user?.role === "STUDENT";
 
-  const [detail, setDetail] = useState<TeachingClassDetail | null>(null)
-  const [description, setDescription] = useState('')
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null)
-  const [newDate, setNewDate] = useState('')
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
-  const [savingDesc, setSavingDesc] = useState(false)
-  const [blockingStudent, setBlockingStudent] = useState<PersonBrief | null>(null)
-  const [blockReason, setBlockReason] = useState('')
+  const [detail, setDetail] = useState<TeachingClassDetail | null>(null);
+  const [description, setDescription] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(
+    null,
+  );
+  const [newDate, setNewDate] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [savingDesc, setSavingDesc] = useState(false);
+  const [blockingStudent, setBlockingStudent] = useState<PersonBrief | null>(
+    null,
+  );
+  const [blockReason, setBlockReason] = useState("");
 
   const refresh = useCallback(async () => {
-    const data = await getClass(id)
-    setDetail(data)
-    setDescription(data.description || '')
+    const data = await getClass(id);
+    setDetail(data);
+    setDescription(data.description || "");
     setSelectedSessionId((prev) => {
-      if (prev && data.sessions.some((s) => s.id === prev)) return prev
-      return null
-    })
-  }, [id])
+      if (prev && data.sessions.some((s) => s.id === prev)) return prev;
+      return null;
+    });
+  }, [id]);
 
   useEffect(() => {
-    if (!Number.isFinite(id)) return
-    refresh().catch((err) => setError(getErrorMessage(err, 'Could not load class.')))
-  }, [id, refresh])
+    if (!Number.isFinite(id)) return;
+    refresh().catch((err) =>
+      setError(getErrorMessage(err, "Could not load class.")),
+    );
+  }, [id, refresh]);
 
-  if (!user) return null
+  if (!user) return null;
 
-  const selected = detail?.sessions.find((s) => s.id === selectedSessionId) || null
+  const selected =
+    detail?.sessions.find((s) => s.id === selectedSessionId) || null;
 
   const saveDescription = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!isTeacher || !detail) return
-    setSavingDesc(true)
-    setError('')
-    setMessage('')
+    e.preventDefault();
+    if (!isTeacher || !detail) return;
+    setSavingDesc(true);
+    setError("");
+    setMessage("");
     try {
-      const updated = await updateClass(detail.id, { description })
-      setDetail(updated)
-      setMessage('Description saved.')
+      const updated = await updateClass(detail.id, { description });
+      setDetail(updated);
+      setMessage("Description saved.");
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not save description.'))
+      setError(getErrorMessage(err, "Could not save description."));
     } finally {
-      setSavingDesc(false)
+      setSavingDesc(false);
     }
-  }
+  };
 
   const openBlockStudent = (student: PersonBrief) => {
-    setBlockReason('absent for the last 3 consecutive classes.')
-    setBlockingStudent(student)
-  }
+    setBlockReason("absent for the last 3 consecutive classes.");
+    setBlockingStudent(student);
+  };
 
   const submitBlockStudent = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!detail || !blockingStudent) return
+    e.preventDefault();
+    if (!detail || !blockingStudent) return;
     try {
-      await blockClassStudent(detail.id, blockingStudent.id, blockReason)
-      setBlockingStudent(null)
-      setMessage(`${personName(blockingStudent)} has been blocked.`)
-      await refresh()
+      await blockClassStudent(detail.id, blockingStudent.id, blockReason);
+      setBlockingStudent(null);
+      setMessage(`${personName(blockingStudent)} has been blocked.`);
+      await refresh();
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not block this student.'))
+      setError(getErrorMessage(err, "Could not block this student."));
     }
-  }
+  };
 
   const handleAddSession = async () => {
-    if (!detail || !newDate) return
+    if (!detail || !newDate) return;
     try {
-      await createSession(detail.id, { session_date: newDate })
-      setNewDate('')
-      setMessage('Session date added.')
-      await refresh()
+      await createSession(detail.id, { session_date: newDate });
+      setNewDate("");
+      setMessage("Session date added.");
+      await refresh();
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not add session.'))
+      setError(getErrorMessage(err, "Could not add session."));
     }
-  }
+  };
 
   const handleDeleteSession = async (sessionId: number) => {
-    const session = detail?.sessions.find((s) => s.id === sessionId)
+    const session = detail?.sessions.find((s) => s.id === sessionId);
     if (session?.is_started) {
-      setError('Started sessions cannot be deleted.')
-      return
+      setError("Started sessions cannot be deleted.");
+      return;
     }
-    if (!window.confirm('Delete this session date?')) return
+    if (!window.confirm("Delete this session date?")) return;
     try {
-      await deleteSession(sessionId)
-      setMessage('Session deleted.')
-      await refresh()
+      await deleteSession(sessionId);
+      setMessage("Session deleted.");
+      await refresh();
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not delete session.'))
+      setError(getErrorMessage(err, "Could not delete session."));
     }
-  }
+  };
 
   return (
     <div className="page-shell">
@@ -224,7 +234,7 @@ export default function ClassDetailPage() {
         <header className="dash-header compact">
           <div>
             <p className="brand light">Class</p>
-            <h1>{detail?.name || 'Loading…'}</h1>
+            <h1>{detail?.name || "Loading…"}</h1>
             <p className="admin-cta">
               <Link to={myClassesPath(user.role)}>← My classes</Link>
             </p>
@@ -242,7 +252,7 @@ export default function ClassDetailPage() {
                 <strong>Teacher 1:</strong> {personLabel(detail.teacher_1)}
                 {detail.teacher_2 && (
                   <>
-                    {' · '}
+                    {" · "}
                     <strong>Teacher 2:</strong> {personLabel(detail.teacher_2)}
                   </>
                 )}
@@ -259,13 +269,19 @@ export default function ClassDetailPage() {
                     />
                   </label>
                   <div className="form-actions">
-                    <button type="submit" className="home-btn" disabled={savingDesc}>
-                      {savingDesc ? 'Saving…' : 'Save description'}
+                    <button
+                      type="submit"
+                      className="home-btn"
+                      disabled={savingDesc}
+                    >
+                      {savingDesc ? "Saving…" : "Save description"}
                     </button>
                   </div>
                 </form>
               ) : (
-                <p className="header-sub">{detail.description || 'No description.'}</p>
+                <p className="header-sub">
+                  {detail.description || "No description."}
+                </p>
               )}
 
               {isTeacher && (
@@ -286,7 +302,10 @@ export default function ClassDetailPage() {
                           <tr key={s.id}>
                             <td>
                               <div className="student-summary-person">
-                                <span className="attendance-avatar" aria-hidden={!s.avatar_url}>
+                                <span
+                                  className="attendance-avatar"
+                                  aria-hidden={!s.avatar_url}
+                                >
                                   {s.avatar_url ? (
                                     <img src={s.avatar_url} alt="" />
                                   ) : (
@@ -295,12 +314,15 @@ export default function ClassDetailPage() {
                                 </span>
                                 <span>
                                   <strong>{personName(s)}</strong>
-                                  {s.email && <span className="muted">{s.email}</span>}
+                                  {s.email && (
+                                    <span className="muted">{s.email}</span>
+                                  )}
                                 </span>
                               </div>
                             </td>
                             <td>
-                              {s.attendance_present ?? 0}/{s.attendance_total ?? 0}
+                              {s.attendance_present ?? 0}/
+                              {s.attendance_total ?? 0}
                             </td>
                             <td>
                               <div className="recent-attendance-list">
@@ -314,11 +336,15 @@ export default function ClassDetailPage() {
                                       >
                                         —
                                       </span>
-                                    )
+                                    );
                                   }
-                                  const option = ATTENDANCE_OPTIONS.find(
-                                    (item) => item.status === recent.status,
-                                  ) || ATTENDANCE_OPTIONS[ATTENDANCE_OPTIONS.length - 1]
+                                  const option =
+                                    ATTENDANCE_OPTIONS.find(
+                                      (item) => item.status === recent.status,
+                                    ) ||
+                                    ATTENDANCE_OPTIONS[
+                                      ATTENDANCE_OPTIONS.length - 1
+                                    ];
                                   return (
                                     <span
                                       key={recent.date}
@@ -327,16 +353,19 @@ export default function ClassDetailPage() {
                                     >
                                       {option.short}
                                     </span>
-                                  )
+                                  );
                                 })}
-                                {(!s.attendance_recent || s.attendance_recent.length === 0) && (
+                                {(!s.attendance_recent ||
+                                  s.attendance_recent.length === 0) && (
                                   <span className="muted">—</span>
                                 )}
                               </div>
                             </td>
                             <td>
                               {s.account_blocked ? (
-                                <span className="student-blocked-pill">Blocked</span>
+                                <span className="student-blocked-pill">
+                                  Blocked
+                                </span>
                               ) : s.can_block ? (
                                 <button
                                   type="button"
@@ -370,7 +399,11 @@ export default function ClassDetailPage() {
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
                   />
-                  <button type="button" className="home-btn" onClick={handleAddSession}>
+                  <button
+                    type="button"
+                    className="home-btn"
+                    onClick={handleAddSession}
+                  >
                     Add date
                   </button>
                 </div>
@@ -378,24 +411,26 @@ export default function ClassDetailPage() {
 
               <div className="session-picker">
                 {detail.sessions.map((s) => {
-                  const present = s.present_count ?? 0
-                  const total = s.attendance_total ?? 0
-                  const myStatus = s.my_attendance_status
+                  const present = s.present_count ?? 0;
+                  const total = s.attendance_total ?? 0;
+                  const myStatus = s.my_attendance_status;
                   return (
                     <button
                       key={s.id}
                       type="button"
                       className={[
-                        'session-chip',
-                        selectedSessionId === s.id ? 'active' : '',
-                        s.is_started ? 'started' : '',
+                        "session-chip",
+                        selectedSessionId === s.id ? "active" : "",
+                        s.is_started ? "started" : "",
                       ]
                         .filter(Boolean)
-                        .join(' ')}
+                        .join(" ")}
                       onClick={() => setSelectedSessionId(s.id)}
                     >
                       <span className="session-chip-main">
-                        <span className="session-chip-date">{formatSessionDate(s.session_date)}</span>
+                        <span className="session-chip-date">
+                          {formatSessionDate(s.session_date)}
+                        </span>
                         {s.is_started && isTeacher && (
                           <span className="session-chip-summary">
                             {presentSummary(present, total)}
@@ -407,9 +442,11 @@ export default function ClassDetailPage() {
                           </span>
                         )}
                       </span>
-                      {s.is_started && <span className="session-started-pill">Started</span>}
+                      {s.is_started && (
+                        <span className="session-started-pill">Started</span>
+                      )}
                     </button>
-                  )
+                  );
                 })}
                 {detail.sessions.length === 0 && (
                   <p className="header-sub">No calendar dates yet.</p>
@@ -427,7 +464,8 @@ export default function ClassDetailPage() {
               )}
               {isTeacher && selected?.is_started && (
                 <p className="header-sub">
-                  This session has started — its date cannot be changed or deleted.
+                  This session has started — its date cannot be changed or
+                  deleted.
                 </p>
               )}
             </section>
@@ -439,7 +477,7 @@ export default function ClassDetailPage() {
                 isTeacher={!!isTeacher}
                 isStudent={!!isStudent}
                 onSessionUpdated={async () => {
-                  await refresh()
+                  await refresh();
                 }}
                 onMessage={setMessage}
                 onError={setError}
@@ -448,7 +486,11 @@ export default function ClassDetailPage() {
           </>
         )}
         {blockingStudent && (
-          <div className="modal-backdrop" role="presentation" onClick={() => setBlockingStudent(null)}>
+          <div
+            className="modal-backdrop"
+            role="presentation"
+            onClick={() => setBlockingStudent(null)}
+          >
             <div
               className="dash-panel edit-user-modal block-student-modal"
               role="dialog"
@@ -456,7 +498,10 @@ export default function ClassDetailPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h2>Block student</h2>
-              <p>Are you sure you want to block this student. Once Blocked only Admins can unblock</p>
+              <p>
+                Are you sure you want to block this student. Once Blocked only
+                Admins can unblock
+              </p>
               <form className="admin-form" onSubmit={submitBlockStudent}>
                 <label>
                   Reason for blocking
@@ -468,7 +513,11 @@ export default function ClassDetailPage() {
                   />
                 </label>
                 <div className="form-actions">
-                  <button type="button" className="tab" onClick={() => setBlockingStudent(null)}>
+                  <button
+                    type="button"
+                    className="tab"
+                    onClick={() => setBlockingStudent(null)}
+                  >
                     Cancel
                   </button>
                   <button type="submit" className="home-btn danger">
@@ -481,7 +530,7 @@ export default function ClassDetailPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 function SessionPanel({
@@ -493,63 +542,76 @@ function SessionPanel({
   onMessage,
   onError,
 }: {
-  session: ClassSession
-  students: PersonBrief[]
-  isTeacher: boolean
-  isStudent: boolean
-  onSessionUpdated: () => Promise<void>
-  onMessage: (msg: string) => void
-  onError: (msg: string) => void
+  session: ClassSession;
+  students: PersonBrief[];
+  isTeacher: boolean;
+  isStudent: boolean;
+  onSessionUpdated: () => Promise<void>;
+  onMessage: (msg: string) => void;
+  onError: (msg: string) => void;
 }) {
-  const [classwork, setClasswork] = useState(session.classwork || '')
-  const [homework, setHomework] = useState(session.homework || '')
-  const [homeworkDueDate, setHomeworkDueDate] = useState(session.homework_due_date || '')
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [classwork, setClasswork] = useState(session.classwork || "");
+  const [homework, setHomework] = useState(session.homework || "");
+  const [homeworkDueDate, setHomeworkDueDate] = useState(
+    session.homework_due_date || "",
+  );
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [focusStudentId, setFocusStudentId] = useState<number | null>(
     students[0]?.id ?? null,
-  )
-  const [comments, setComments] = useState<SessionComment[]>([])
-  const [commentBody, setCommentBody] = useState('')
-  const [homeworks, setHomeworks] = useState<HomeworkSubmission[]>([])
-  const [materials, setMaterials] = useState<SessionMaterial[]>([])
-  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<number, string>>({})
-  const [sendingEmail, setSendingEmail] = useState(false)
-  const [sendingHomeworkEmail, setSendingHomeworkEmail] = useState(false)
+  );
+  const [comments, setComments] = useState<SessionComment[]>([]);
+  const [commentBody, setCommentBody] = useState("");
+  const [homeworks, setHomeworks] = useState<HomeworkSubmission[]>([]);
+  const [materials, setMaterials] = useState<SessionMaterial[]>([]);
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<number, string>>(
+    {},
+  );
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendingHomeworkEmail, setSendingHomeworkEmail] = useState(false);
 
   useEffect(() => {
-    setClasswork(session.classwork || '')
-    setHomework(session.homework || '')
-    setHomeworkDueDate(session.homework_due_date || '')
-  }, [session.id, session.classwork, session.homework, session.homework_due_date])
+    setClasswork(session.classwork || "");
+    setHomework(session.homework || "");
+    setHomeworkDueDate(session.homework_due_date || "");
+  }, [
+    session.id,
+    session.classwork,
+    session.homework,
+    session.homework_due_date,
+  ]);
 
   const loadSideData = useCallback(async () => {
     const [att, hw, mats] = await Promise.all([
       listAttendance(session.id),
       listHomework(session.id),
       listSessionMaterials(session.id),
-    ])
-    setAttendance(att)
-    setHomeworks(hw)
-    setMaterials(mats)
+    ]);
+    setAttendance(att);
+    setHomeworks(hw);
+    setMaterials(mats);
     setFeedbackDrafts(
-      Object.fromEntries(hw.map((h) => [h.id, h.teacher_feedback || ''])),
-    )
+      Object.fromEntries(hw.map((h) => [h.id, h.teacher_feedback || ""])),
+    );
     if (isStudent) {
-      const mine = await listComments(session.id)
-      setComments(mine)
+      const mine = await listComments(session.id);
+      setComments(mine);
     }
-  }, [session.id, isStudent])
+  }, [session.id, isStudent]);
 
   useEffect(() => {
-    loadSideData().catch((err) => onError(getErrorMessage(err, 'Could not load session data.')))
-  }, [loadSideData, onError])
+    loadSideData().catch((err) =>
+      onError(getErrorMessage(err, "Could not load session data.")),
+    );
+  }, [loadSideData, onError]);
 
   useEffect(() => {
-    if (!isTeacher || focusStudentId == null) return
+    if (!isTeacher || focusStudentId == null) return;
     listComments(session.id, focusStudentId)
       .then(setComments)
-      .catch((err) => onError(getErrorMessage(err, 'Could not load comments.')))
-  }, [isTeacher, focusStudentId, session.id, onError])
+      .catch((err) =>
+        onError(getErrorMessage(err, "Could not load comments.")),
+      );
+  }, [isTeacher, focusStudentId, session.id, onError]);
 
   const saveNotes = async () => {
     try {
@@ -557,28 +619,33 @@ function SessionPanel({
         classwork,
         homework,
         homework_due_date: homeworkDueDate || null,
-      })
-      onMessage('Classwork / homework notes saved.')
-      await onSessionUpdated()
+      });
+      onMessage("Classwork / homework notes saved.");
+      await onSessionUpdated();
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not save notes.'))
+      onError(getErrorMessage(err, "Could not save notes."));
     }
-  }
+  };
 
   const handleStart = async () => {
     try {
-      await startSession(session.id)
-      onMessage('Class started. Attendance rows created.')
-      await onSessionUpdated()
-      await loadSideData()
+      await startSession(session.id);
+      onMessage("Class started. Attendance rows created.");
+      await onSessionUpdated();
+      await loadSideData();
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not start class.'))
+      onError(getErrorMessage(err, "Could not start class."));
     }
-  }
+  };
 
   const handleSendSessionEmail = async () => {
-    if (!window.confirm('Send the classwork, homework, attachments, and attendance email to all students in this class?')) return
-    setSendingEmail(true)
+    if (
+      !window.confirm(
+        "Send the classwork, homework, attachments, and attendance email to all students in this class?",
+      )
+    )
+      return;
+    setSendingEmail(true);
     try {
       // Save the current teacher edits so the email always uses the visible
       // classwork, homework, and target date.
@@ -586,157 +653,182 @@ function SessionPanel({
         classwork,
         homework,
         homework_due_date: homeworkDueDate || null,
-      })
-      const result = await sendSessionEmail(session.id)
-      const skipped = result.skipped_no_email_student_ids.length
+      });
+      const result = await sendSessionEmail(session.id);
+      const skipped = result.skipped_no_email_student_ids.length;
       onMessage(
-        `Class email sent.${result.teacher_copy_sent ? ' A summary was sent to your email address.' : ''}${skipped ? ' Some students were skipped because no email address is available.' : ''}`,
-      )
-      await onSessionUpdated()
+        `Class email sent.${result.teacher_copy_sent ? " A summary was sent to your email address." : ""}${skipped ? " Some students were skipped because no email address is available." : ""}`,
+      );
+      await onSessionUpdated();
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not send the class email.'))
+      onError(getErrorMessage(err, "Could not send the class email."));
     } finally {
-      setSendingEmail(false)
+      setSendingEmail(false);
     }
-  }
+  };
 
-  const handleAttendance = async (recordId: number, status: AttendanceStatus) => {
+  const handleAttendance = async (
+    recordId: number,
+    status: AttendanceStatus,
+  ) => {
     try {
-      const updated = await updateAttendance(session.id, recordId, status)
-      setAttendance((prev) => prev.map((r) => (r.id === recordId ? updated : r)))
-      await onSessionUpdated()
+      const updated = await updateAttendance(session.id, recordId, status);
+      setAttendance((prev) =>
+        prev.map((r) => (r.id === recordId ? updated : r)),
+      );
+      await onSessionUpdated();
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not update attendance.'))
+      onError(getErrorMessage(err, "Could not update attendance."));
     }
-  }
+  };
 
   const markAllPresent = async () => {
-    const pending = attendance.filter((row) => row.status !== 'PRESENT')
+    const pending = attendance.filter((row) => row.status !== "PRESENT");
     if (pending.length === 0) {
-      onMessage('All students are already marked present.')
-      return
+      onMessage("All students are already marked present.");
+      return;
     }
     try {
       const updatedRows = await Promise.all(
-        pending.map((row) => updateAttendance(session.id, row.id, 'PRESENT')),
-      )
-      const byId = new Map(updatedRows.map((r) => [r.id, r]))
-      setAttendance((prev) => prev.map((r) => byId.get(r.id) || r))
-      onMessage(`Marked ${pending.length} student${pending.length === 1 ? '' : 's'} present.`)
-      await onSessionUpdated()
+        pending.map((row) => updateAttendance(session.id, row.id, "PRESENT")),
+      );
+      const byId = new Map(updatedRows.map((r) => [r.id, r]));
+      setAttendance((prev) => prev.map((r) => byId.get(r.id) || r));
+      onMessage(
+        `Marked ${pending.length} student${pending.length === 1 ? "" : "s"} present.`,
+      );
+      await onSessionUpdated();
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not mark all present.'))
+      onError(getErrorMessage(err, "Could not mark all present."));
     }
-  }
+  };
 
   const handleAddComment = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!commentBody.trim()) return
+    e.preventDefault();
+    if (!commentBody.trim()) return;
     try {
       const created = await createComment(
         session.id,
         commentBody.trim(),
-        isTeacher ? focusStudentId ?? undefined : undefined,
-      )
-      setComments((prev) => [...prev, created])
-      setCommentBody('')
-      onMessage('Comment added.')
+        isTeacher ? (focusStudentId ?? undefined) : undefined,
+      );
+      setComments((prev) => [...prev, created]);
+      setCommentBody("");
+      onMessage("Comment added.");
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not add comment.'))
+      onError(getErrorMessage(err, "Could not add comment."));
     }
-  }
+  };
 
   const handleEditComment = async (comment: SessionComment) => {
-    const next = window.prompt('Edit comment', comment.body)
-    if (next == null || !next.trim()) return
+    const next = window.prompt("Edit comment", comment.body);
+    if (next == null || !next.trim()) return;
     try {
-      const updated = await updateComment(comment.id, next.trim())
-      setComments((prev) => prev.map((c) => (c.id === comment.id ? updated : c)))
+      const updated = await updateComment(comment.id, next.trim());
+      setComments((prev) =>
+        prev.map((c) => (c.id === comment.id ? updated : c)),
+      );
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not edit comment.'))
+      onError(getErrorMessage(err, "Could not edit comment."));
     }
-  }
+  };
 
   const handleDeleteComment = async (commentId: number) => {
     try {
-      await deleteComment(commentId)
-      setComments((prev) => prev.filter((c) => c.id !== commentId))
+      await deleteComment(commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not delete comment.'))
+      onError(getErrorMessage(err, "Could not delete comment."));
     }
-  }
+  };
 
   const handleUpload = async (file: File | null) => {
-    if (!file) return
+    if (!file) return;
     try {
-      const hw = await uploadHomework(session.id, file)
-      setHomeworks((prev) => [hw, ...prev])
-      onMessage('Homework uploaded.')
+      const hw = await uploadHomework(session.id, file);
+      setHomeworks((prev) => [hw, ...prev]);
+      onMessage("Homework uploaded.");
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not upload homework.'))
-      throw err
+      onError(getErrorMessage(err, "Could not upload homework."));
+      throw err;
     }
-  }
+  };
 
   const handleSendHomeworkEmail = async () => {
-    if (!window.confirm('Send your communication notes and homework attachment links to your teacher? You will receive a copy by email.')) return
-    setSendingHomeworkEmail(true)
+    if (
+      !window.confirm(
+        "Send your communication notes and homework attachment links to your teacher? You will receive a copy by email.",
+      )
+    )
+      return;
+    setSendingHomeworkEmail(true);
     try {
-      const result = await sendHomeworkSubmissionEmail(session.id)
+      const result = await sendHomeworkSubmissionEmail(session.id);
       if (result.homework_submitted) {
-        setAttendance((previous) => previous.map((record) => ({
-          ...record,
-          homework_submitted: true,
-        })))
+        setAttendance((previous) =>
+          previous.map((record) => ({
+            ...record,
+            homework_submitted: true,
+          })),
+        );
       }
       onMessage(
-        `Homework submission email sent to your teacher.${result.student_copy_sent ? ' A copy was sent to your email address.' : ''}${!result.teacher_email_sent ? ' No teacher email address is available.' : ''}`,
-      )
+        `Homework submission email sent to your teacher.${result.student_copy_sent ? " A copy was sent to your email address." : ""}${!result.teacher_email_sent ? " No teacher email address is available." : ""}`,
+      );
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not send the homework submission email.'))
+      onError(
+        getErrorMessage(err, "Could not send the homework submission email."),
+      );
     } finally {
-      setSendingHomeworkEmail(false)
+      setSendingHomeworkEmail(false);
     }
-  }
+  };
 
   const saveFeedback = async (homeworkId: number) => {
     try {
       const updated = await updateHomeworkFeedback(
         homeworkId,
-        feedbackDrafts[homeworkId] || '',
-      )
-      setHomeworks((prev) => prev.map((h) => (h.id === homeworkId ? updated : h)))
-      onMessage('Feedback saved.')
+        feedbackDrafts[homeworkId] || "",
+      );
+      setHomeworks((prev) =>
+        prev.map((h) => (h.id === homeworkId ? updated : h)),
+      );
+      onMessage("Feedback saved.");
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not save feedback.'))
+      onError(getErrorMessage(err, "Could not save feedback."));
     }
-  }
+  };
 
-  const handleMaterialUpload = async (kind: SessionMaterialKind, file: File | null) => {
-    if (!file) return
+  const handleMaterialUpload = async (
+    kind: SessionMaterialKind,
+    file: File | null,
+  ) => {
+    if (!file) return;
     try {
-      const material = await uploadSessionMaterial(session.id, kind, file)
-      setMaterials((prev) => [...prev, material])
-      onMessage(`${kind === 'CLASSWORK' ? 'Classwork' : 'Homework'} file uploaded.`)
+      const material = await uploadSessionMaterial(session.id, kind, file);
+      setMaterials((prev) => [...prev, material]);
+      onMessage(
+        `${kind === "CLASSWORK" ? "Classwork" : "Homework"} file uploaded.`,
+      );
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not upload file.'))
-      throw err
+      onError(getErrorMessage(err, "Could not upload file."));
+      throw err;
     }
-  }
+  };
 
   const handleMaterialDelete = async (materialId: number) => {
-    if (!window.confirm('Delete this file?')) return
+    if (!window.confirm("Delete this file?")) return;
     try {
-      await deleteSessionMaterial(materialId)
-      setMaterials((prev) => prev.filter((m) => m.id !== materialId))
-      onMessage('File deleted.')
+      await deleteSessionMaterial(materialId);
+      setMaterials((prev) => prev.filter((m) => m.id !== materialId));
+      onMessage("File deleted.");
     } catch (err) {
-      onError(getErrorMessage(err, 'Could not delete file.'))
+      onError(getErrorMessage(err, "Could not delete file."));
     }
-  }
+  };
 
-  const classworkMaterials = materials.filter((m) => m.kind === 'CLASSWORK')
-  const homeworkMaterials = materials.filter((m) => m.kind === 'HOMEWORK')
+  const classworkMaterials = materials.filter((m) => m.kind === "CLASSWORK");
+  const homeworkMaterials = materials.filter((m) => m.kind === "HOMEWORK");
 
   return (
     <section className="dash-panel">
@@ -759,7 +851,7 @@ function SessionPanel({
               <MediaCaptureUpload
                 label="Choose classwork file"
                 maxBytes={20 * 1024 * 1024}
-                onUpload={(file) => handleMaterialUpload('CLASSWORK', file)}
+                onUpload={(file) => handleMaterialUpload("CLASSWORK", file)}
               />
             )}
             <ul className="material-list">
@@ -767,10 +859,10 @@ function SessionPanel({
                 <li key={m.id}>
                   {m.file_url ? (
                     <a href={m.file_url} target="_blank" rel="noreferrer">
-                      {m.original_filename || 'View file'}
+                      {m.original_filename || "View file"}
                     </a>
                   ) : (
-                    m.original_filename || 'File'
+                    m.original_filename || "File"
                   )}
                   {isTeacher && (
                     <button
@@ -799,7 +891,9 @@ function SessionPanel({
             />
           </label>
           <label className="full homework-due-date">
-            <span className="homework-due-date-title">Homework target date</span>
+            <span className="homework-due-date-title">
+              Homework target date
+            </span>
             <span className="homework-due-date-field">
               <input
                 type="date"
@@ -819,7 +913,7 @@ function SessionPanel({
               <MediaCaptureUpload
                 label="Choose homework file"
                 maxBytes={20 * 1024 * 1024}
-                onUpload={(file) => handleMaterialUpload('HOMEWORK', file)}
+                onUpload={(file) => handleMaterialUpload("HOMEWORK", file)}
               />
             )}
             <ul className="material-list">
@@ -827,10 +921,10 @@ function SessionPanel({
                 <li key={m.id}>
                   {m.file_url ? (
                     <a href={m.file_url} target="_blank" rel="noreferrer">
-                      {m.original_filename || 'View file'}
+                      {m.original_filename || "View file"}
                     </a>
                   ) : (
-                    m.original_filename || 'File'
+                    m.original_filename || "File"
                   )}
                   {isTeacher && (
                     <button
@@ -865,7 +959,7 @@ function SessionPanel({
                 onClick={handleSendSessionEmail}
                 disabled={sendingEmail}
               >
-                {sendingEmail ? 'Sending email…' : 'Send email'}
+                {sendingEmail ? "Sending email…" : "Send email"}
               </button>
             </>
           ) : (
@@ -877,7 +971,7 @@ function SessionPanel({
                 disabled={isFutureSession(session.session_date)}
                 title={
                   isFutureSession(session.session_date)
-                    ? 'This class can be started on or after its date.'
+                    ? "This class can be started on or after its date."
                     : undefined
                 }
               >
@@ -900,7 +994,7 @@ function SessionPanel({
               <h3>Attendance</h3>
               <p className="attendance-summary">
                 {presentSummary(
-                  attendance.filter((r) => r.status === 'PRESENT').length,
+                  attendance.filter((r) => r.status === "PRESENT").length,
                   attendance.length,
                 )}
               </p>
@@ -926,7 +1020,7 @@ function SessionPanel({
                   {ATTENDANCE_OPTIONS.map((opt) => (
                     <label
                       key={opt.status}
-                      className={`att-radio ${opt.className}${row.status === opt.status ? ' selected' : ''}`}
+                      className={`att-radio ${opt.className}${row.status === opt.status ? " selected" : ""}`}
                       title={opt.title}
                     >
                       <input
@@ -941,21 +1035,24 @@ function SessionPanel({
                   ))}
                 </div>
                 <span
-                  className={`hw-mark${row.homework_submitted ? ' submitted' : ' missing'}`}
+                  className={`hw-mark${row.homework_submitted ? " submitted" : " missing"}`}
                   title={
                     row.homework_submitted
-                      ? 'Homework submitted'
-                      : 'Homework not submitted'
+                      ? "Homework submitted"
+                      : "Homework not submitted"
                   }
                 >
-                  {row.homework_submitted ? 'HW ✓' : 'HW ✕'}
+                  {row.homework_submitted ? "HW ✓" : "HW ✕"}
                 </span>
                 <button
                   type="button"
-                  className={`attendance-name${focusStudentId === row.student.id ? ' selected' : ''}`}
+                  className={`attendance-name${focusStudentId === row.student.id ? " selected" : ""}`}
                   onClick={() => setFocusStudentId(row.student.id)}
                 >
-                  <span className="attendance-avatar" aria-hidden={!row.student.avatar_url}>
+                  <span
+                    className="attendance-avatar"
+                    aria-hidden={!row.student.avatar_url}
+                  >
                     {row.student.avatar_url ? (
                       <img src={row.student.avatar_url} alt="" />
                     ) : (
@@ -976,7 +1073,8 @@ function SessionPanel({
       {isStudent && session.is_started && attendance[0] && (
         <div className="student-session-status">
           <p>
-            <strong>Your attendance:</strong> {ATTENDANCE_LABELS[attendance[0].status]}
+            <strong>Your attendance:</strong>{" "}
+            {ATTENDANCE_LABELS[attendance[0].status]}
           </p>
           <label className="hw-submit-check">
             <input
@@ -990,7 +1088,9 @@ function SessionPanel({
       )}
 
       {isStudent && !session.is_started && (
-        <p className="header-sub">Attendance and homework submission open after the class is started.</p>
+        <p className="header-sub">
+          Attendance and homework submission open after the class is started.
+        </p>
       )}
 
       {session.is_started ? (
@@ -999,14 +1099,14 @@ function SessionPanel({
             Communication
             {isTeacher && focusStudentId != null && (
               <span className="muted">
-                {' '}
-                —{' '}
+                {" "}
+                —{" "}
                 {personLabel(
                   students.find((s) => s.id === focusStudentId) || {
                     id: 0,
-                    username: 'student',
-                    first_name: '',
-                    last_name: '',
+                    username: "student",
+                    first_name: "",
+                    last_name: "",
                   },
                 )}
               </span>
@@ -1017,7 +1117,7 @@ function SessionPanel({
             <label>
               Student for communication
               <select
-                value={focusStudentId ?? ''}
+                value={focusStudentId ?? ""}
                 onChange={(e) => setFocusStudentId(Number(e.target.value))}
               >
                 {students.map((s) => (
@@ -1060,7 +1160,9 @@ function SessionPanel({
                 )}
               </li>
             ))}
-            {comments.length === 0 && <li className="header-sub">No messages yet.</li>}
+            {comments.length === 0 && (
+              <li className="header-sub">No messages yet.</li>
+            )}
           </ul>
 
           <form className="admin-form" onSubmit={handleAddComment}>
@@ -1100,7 +1202,9 @@ function SessionPanel({
                 onClick={handleSendHomeworkEmail}
                 disabled={sendingHomeworkEmail}
               >
-                {sendingHomeworkEmail ? 'Sending email…' : 'Send email to teacher'}
+                {sendingHomeworkEmail
+                  ? "Sending email…"
+                  : "Send email to teacher"}
               </button>
             </p>
           )}
@@ -1119,10 +1223,10 @@ function SessionPanel({
               {isTeacher && <strong>{personLabel(hw.student)} — </strong>}
               {hw.file_url ? (
                 <a href={hw.file_url} target="_blank" rel="noreferrer">
-                  {hw.original_filename || 'View file'}
+                  {hw.original_filename || "View file"}
                 </a>
               ) : (
-                hw.original_filename || 'File'
+                hw.original_filename || "File"
               )}
               <span className="muted"> ({hw.storage_backend})</span>
             </div>
@@ -1130,25 +1234,34 @@ function SessionPanel({
               <div className="feedback-block">
                 <textarea
                   rows={2}
-                  value={feedbackDrafts[hw.id] || ''}
+                  value={feedbackDrafts[hw.id] || ""}
                   onChange={(e) =>
-                    setFeedbackDrafts((prev) => ({ ...prev, [hw.id]: e.target.value }))
+                    setFeedbackDrafts((prev) => ({
+                      ...prev,
+                      [hw.id]: e.target.value,
+                    }))
                   }
                   placeholder="Teacher feedback"
                 />
-                <button type="button" className="home-btn" onClick={() => saveFeedback(hw.id)}>
+                <button
+                  type="button"
+                  className="home-btn"
+                  onClick={() => saveFeedback(hw.id)}
+                >
                   Save feedback
                 </button>
               </div>
             ) : (
               <p className="header-sub">
-                Feedback: {hw.teacher_feedback || 'None yet.'}
+                Feedback: {hw.teacher_feedback || "None yet."}
               </p>
             )}
           </li>
         ))}
-        {homeworks.length === 0 && <li className="header-sub">No homework uploaded yet.</li>}
+        {homeworks.length === 0 && (
+          <li className="header-sub">No homework uploaded yet.</li>
+        )}
       </ul>
     </section>
-  )
+  );
 }
